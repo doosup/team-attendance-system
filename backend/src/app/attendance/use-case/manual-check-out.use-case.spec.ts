@@ -1,3 +1,4 @@
+import { InMemoryAuditLogRepository } from '../../../../test/fakes/in-memory-audit-log.repository';
 import { CustomException } from '../../../domain/exception/custom.exception';
 import { kstAt } from '../../../domain/value/work-date';
 import { FixedClock } from '../../../../test/fakes/fixed-clock';
@@ -14,6 +15,7 @@ describe('ManualCheckOutUseCase', () => {
   let attendances: InMemoryAttendanceRepository;
   let checkIn: CheckInUseCase;
   let manual: ManualCheckOutUseCase;
+  let audit: InMemoryAuditLogRepository;
   let ledger: InMemoryLedgerRepository;
 
   // 목요일 09:00 출근 후 퇴근 안 찍음 → 금요일 09:00 출근
@@ -24,9 +26,11 @@ describe('ManualCheckOutUseCase', () => {
       clock,
       attendances,
       new InMemoryRequestDayRepository(),
+      new InMemoryAuditLogRepository(),
     );
     ledger = new InMemoryLedgerRepository();
-    manual = new ManualCheckOutUseCase(clock, attendances, ledger);
+    audit = new InMemoryAuditLogRepository();
+    manual = new ManualCheckOutUseCase(clock, attendances, ledger, audit);
     await checkIn.execute({ user: KIM, ip: '127.0.0.1' });
     clock.at('2026-11-13', '09:00:00');
     await checkIn.execute({ user: KIM, ip: '127.0.0.1' });
@@ -85,7 +89,12 @@ describe('ManualCheckOutUseCase', () => {
   it('입력하고 나면 퇴근 버튼이 다시 동작한다', async () => {
     await manual.execute(input('18:00:00'));
     clock.at('2026-11-13', '18:00:00');
-    const out = await new CheckOutUseCase(clock, attendances, ledger).execute({
+    const out = await new CheckOutUseCase(
+      clock,
+      attendances,
+      ledger,
+      new InMemoryAuditLogRepository(),
+    ).execute({
       user: KIM,
       ip: '127.0.0.1',
     });
@@ -109,5 +118,16 @@ describe('ManualCheckOutUseCase', () => {
     expect(
       await codeOf(manual.execute(input('18:00:00', '2026-11-12', 1, LEAD))),
     ).toBe('MANUAL_CHECKOUT_NOT_PENDING');
+  });
+
+  it('직접 입력하면 MANUAL_CHECK_OUT 이력에 입력한 시각을 남긴다', async () => {
+    await manual.execute(input('18:00:00'));
+    expect(audit.rows[0]).toMatchObject({
+      action: 'MANUAL_CHECK_OUT',
+      targetId: 1,
+      payload: expect.objectContaining({
+        checkOutAt: kstAt('2026-11-12', '18:00:00').toISOString(),
+      }) as unknown,
+    });
   });
 });

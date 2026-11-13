@@ -1,3 +1,4 @@
+import { InMemoryAuditLogRepository } from '../../../../test/fakes/in-memory-audit-log.repository';
 import { CustomException } from '../../../domain/exception/custom.exception';
 import { kstAt } from '../../../domain/value/work-date';
 import { FixedClock } from '../../../../test/fakes/fixed-clock';
@@ -11,12 +12,14 @@ describe('CheckInUseCase', () => {
   let attendances: InMemoryAttendanceRepository;
   let requestDays: InMemoryRequestDayRepository;
   let useCase: CheckInUseCase;
+  let audit: InMemoryAuditLogRepository;
 
   beforeEach(() => {
     clock = new FixedClock('2026-11-13', '09:30:00'); // 금
     attendances = new InMemoryAttendanceRepository();
     requestDays = new InMemoryRequestDayRepository();
-    useCase = new CheckInUseCase(clock, attendances, requestDays);
+    audit = new InMemoryAuditLogRepository();
+    useCase = new CheckInUseCase(clock, attendances, requestDays, audit);
   });
 
   const checkIn = () => useCase.execute({ user: KIM, ip: '127.0.0.1' });
@@ -112,5 +115,29 @@ describe('CheckInUseCase', () => {
       isLate: false,
     });
     expect(attendances.rows[0].props.requestDayId).toBe(7);
+  });
+
+  it('출근하면 CHECK_IN 이력을 Clock 시각으로 남긴다', async () => {
+    await checkIn();
+    expect(audit.rows).toEqual([
+      expect.objectContaining({
+        actorId: KIM.id,
+        action: 'CHECK_IN',
+        targetType: 'Attendance',
+        targetId: 1,
+        ip: '127.0.0.1',
+        occurredAt: kstAt('2026-11-13', '09:30:00'),
+        payload: expect.objectContaining({
+          workDate: '2026-11-13',
+          isLate: false,
+        }) as unknown,
+      }),
+    ]);
+  });
+
+  it('거부된 출근은 이력을 남기지 않는다 (트랜잭션과 함께 롤백되는 쪽)', async () => {
+    clock.at('2026-11-13', '06:00:00');
+    await checkIn().catch(() => undefined);
+    expect(audit.rows).toEqual([]);
   });
 });

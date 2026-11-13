@@ -1,3 +1,4 @@
+import { InMemoryAuditLogRepository } from '../../../../test/fakes/in-memory-audit-log.repository';
 import { CustomException } from '../../../domain/exception/custom.exception';
 import { kstAt } from '../../../domain/value/work-date';
 import { FixedClock } from '../../../../test/fakes/fixed-clock';
@@ -13,6 +14,7 @@ describe('CheckOutUseCase', () => {
   let attendances: InMemoryAttendanceRepository;
   let checkIn: CheckInUseCase;
   let checkOut: CheckOutUseCase;
+  let audit: InMemoryAuditLogRepository;
   let ledger: InMemoryLedgerRepository;
   let requestDays: InMemoryRequestDayRepository;
 
@@ -21,8 +23,14 @@ describe('CheckOutUseCase', () => {
     attendances = new InMemoryAttendanceRepository();
     requestDays = new InMemoryRequestDayRepository();
     ledger = new InMemoryLedgerRepository();
-    checkIn = new CheckInUseCase(clock, attendances, requestDays);
-    checkOut = new CheckOutUseCase(clock, attendances, ledger);
+    checkIn = new CheckInUseCase(
+      clock,
+      attendances,
+      requestDays,
+      new InMemoryAuditLogRepository(),
+    );
+    audit = new InMemoryAuditLogRepository();
+    checkOut = new CheckOutUseCase(clock, attendances, ledger, audit);
   });
 
   const out = () => checkOut.execute({ user: KIM, ip: '127.0.0.1' });
@@ -117,5 +125,16 @@ describe('CheckOutUseCase', () => {
     clock.at('2026-11-13', '18:00:00');
     await out();
     expect(ledger.rows).toHaveLength(0);
+  });
+
+  it('퇴근하면 CHECK_OUT 이력에 근무시간·조퇴·OFF 지급 여부를 남긴다', async () => {
+    await checkIn.execute({ user: KIM, ip: '127.0.0.1' });
+    clock.at('2026-11-13', '18:00:00');
+    await out();
+    expect(audit.rows[0]).toMatchObject({
+      action: 'CHECK_OUT',
+      targetType: 'Attendance',
+      payload: { workedMinutes: 480, isEarlyLeave: false, offGranted: false },
+    });
   });
 });

@@ -1,3 +1,4 @@
+import { Transactional } from '@nestjs-cls/transactional';
 import { Injectable } from '@nestjs/common';
 import { Attendance, DayType } from '../../../domain/entity/attendance.entity';
 import { User } from '../../../domain/entity/user.entity';
@@ -7,6 +8,7 @@ import {
   resolveDay,
 } from '../../../domain/policy/attendance.policy';
 import { Clock } from '../../../domain/port/clock.port';
+import { AuditLogRepository } from '../../../domain/repository/audit-log.repository';
 import { AttendanceRepository } from '../../../domain/repository/attendance.repository';
 import { RequestDayRepository } from '../../../domain/repository/request-day.repository';
 import { isBusinessDay } from '../../../domain/value/business-day';
@@ -19,7 +21,6 @@ import {
 } from '../dto/check-in.dto';
 
 // 출근은 항상 즉시 기록하고, 미기록 퇴근 건은 응답으로 알려 준다 (ADR-005).
-// shortcut: CHECK_IN 이력은 아직 남기지 않음, ATT-6에서 연결.
 @Injectable()
 export class CheckInUseCase implements UseCase<
   { user: User; ip: string },
@@ -29,8 +30,10 @@ export class CheckInUseCase implements UseCase<
     private readonly clock: Clock,
     private readonly attendances: AttendanceRepository,
     private readonly requestDays: RequestDayRepository,
+    private readonly audit: AuditLogRepository,
   ) {}
 
+  @Transactional()
   async execute({
     user,
     ip,
@@ -67,6 +70,15 @@ export class CheckInUseCase implements UseCase<
         requestDayId: day.requestDayId,
       }),
     );
+    await this.audit.append({
+      actorId: user.id,
+      action: 'CHECK_IN',
+      targetType: 'Attendance',
+      targetId: saved.id,
+      payload: { workDate, dayType, isLate, checkInAt: now.toISOString() },
+      ip,
+      occurredAt: now,
+    });
     const latest = await this.attendances.findLatestBefore(user.id, workDate);
     return new CheckInResult(
       AttendanceResult.from(saved),

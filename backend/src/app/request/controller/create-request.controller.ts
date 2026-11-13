@@ -1,4 +1,5 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import { ClientIp } from '../../../common/decorators/client-ip.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { User } from '../../../domain/entity/user.entity';
 import { CreateRequestRequest, RequestResult } from '../dto/create-request.dto';
@@ -11,8 +12,9 @@ export class CreateRequestController {
   @Post()
   create(
     @CurrentUser() user: User,
+    @ClientIp() ip: string,
     @Body() input: CreateRequestRequest,
   ): Promise<RequestResult> {
-    return this.useCase.execute({ user, input });
+    return this.useCase.execute({ user, input, ip });
   }
 }

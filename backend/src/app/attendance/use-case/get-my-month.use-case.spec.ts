@@ -1,3 +1,4 @@
+import { InMemoryAuditLogRepository } from '../../../../test/fakes/in-memory-audit-log.repository';
 import { FixedClock } from '../../../../test/fakes/fixed-clock';
 import { InMemoryAttendanceRepository } from '../../../../test/fakes/in-memory-attendance.repository';
 import { InMemoryRequestDayRepository } from '../../../../test/fakes/in-memory-request-day.repository';
@@ -13,6 +14,7 @@ describe('GetMyMonthUseCase', () => {
       clock,
       attendances,
       new InMemoryRequestDayRepository(),
+      new InMemoryAuditLogRepository(),
     );
     await checkIn.execute({ user: KIM, ip: '127.0.0.1' }); // 10월
     clock.at('2026-11-03', '09:00:00');

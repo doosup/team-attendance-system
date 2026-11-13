@@ -12,6 +12,7 @@ import {
   isRemoteOverLimit,
 } from '../../../domain/policy/request.policy';
 import { Clock } from '../../../domain/port/clock.port';
+import { AuditLogRepository } from '../../../domain/repository/audit-log.repository';
 import { LedgerRepository } from '../../../domain/repository/ledger.repository';
 import { RequestDayRepository } from '../../../domain/repository/request-day.repository';
 import { RequestRepository } from '../../../domain/repository/request.repository';
@@ -20,10 +21,9 @@ import { syncLedger } from '../../balance/sync-ledger';
 import { UseCase } from '../../use-case.interface';
 import { CreateRequestRequest, RequestResult } from '../dto/create-request.dto';
 
-type Input = { user: User; input: CreateRequestRequest };
+type Input = { user: User; input: CreateRequestRequest; ip: string };
 
 // 신청: 날짜 계산 → 기한 → 중복 → 재택 한도 → 잔여 → 저장 → 원장 차감 (한 트랜잭션)
-// shortcut: REQUEST_CREATE 이력(리드 자동 승인·예외 표시 포함)은 ATT-6에서 연결.
 @Injectable()
 export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
   constructor(
@@ -31,10 +31,11 @@ export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
     private readonly requests: RequestRepository,
     private readonly requestDays: RequestDayRepository,
     private readonly ledger: LedgerRepository,
+    private readonly audit: AuditLogRepository,
   ) {}
 
   @Transactional()
-  async execute({ user, input }: Input): Promise<RequestResult> {
+  async execute({ user, input, ip }: Input): Promise<RequestResult> {
     const now = this.clock.now();
     const today = workDateOf(now);
     const { type, startDate, endDate } = input;
@@ -95,6 +96,23 @@ export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
       ];
     });
     await this.ledger.append(uses);
+    await this.audit.append({
+      actorId: user.id,
+      action: 'REQUEST_CREATE',
+      targetType: 'Request',
+      targetId: saved.id,
+      payload: {
+        type,
+        startDate,
+        endDate,
+        dates,
+        status: saved.props.status,
+        isOverLimit,
+        autoApproved: saved.props.status === 'APPROVED',
+      },
+      ip,
+      occurredAt: now,
+    });
     return RequestResult.from(saved);
   }
 

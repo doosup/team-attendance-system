@@ -1,3 +1,4 @@
+import { InMemoryAuditLogRepository } from '../../../../test/fakes/in-memory-audit-log.repository';
 import { CustomException } from '../../../domain/exception/custom.exception';
 import { balanceOf } from '../../../domain/policy/balance.policy';
 import { FixedClock } from '../../../../test/fakes/fixed-clock';
@@ -12,16 +13,19 @@ describe('CreateRequestUseCase', () => {
   let requests: InMemoryRequestRepository;
   let ledger: InMemoryLedgerRepository;
   let useCase: CreateRequestUseCase;
+  let audit: InMemoryAuditLogRepository;
 
   beforeEach(() => {
     clock = new FixedClock('2026-11-11', '10:00:00'); // 수, 김근태 연차 10일 적립
     requests = new InMemoryRequestRepository();
     ledger = new InMemoryLedgerRepository();
+    audit = new InMemoryAuditLogRepository();
     useCase = new CreateRequestUseCase(
       clock,
       requests,
       new InMemoryRequestDayRepository(requests),
       ledger,
+      audit,
     );
   });
 
@@ -69,6 +73,7 @@ describe('CreateRequestUseCase', () => {
     expect(
       await codeOf(
         useCase.execute({
+          ip: '127.0.0.1',
           user: KIM,
           input: annual('2026-11-16', '2026-11-30'),
         }),
@@ -79,14 +84,30 @@ describe('CreateRequestUseCase', () => {
   it('기한(직전 영업일 17:00:00)이 지나면 REQUEST_DEADLINE_PASSED', async () => {
     clock.at('2026-11-12', '17:00:01');
     expect(
-      await codeOf(useCase.execute({ user: KIM, input: annual('2026-11-13') })),
+      await codeOf(
+        useCase.execute({
+          ip: '127.0.0.1',
+          user: KIM,
+          input: annual('2026-11-13'),
+        }),
+      ),
     ).toBe('REQUEST_DEADLINE_PASSED');
   });
 
   it('이미 살아 있는 신청과 날짜가 겹치면 OVERLAPPING_REQUEST', async () => {
-    await useCase.execute({ user: KIM, input: annual('2026-11-16') });
+    await useCase.execute({
+      ip: '127.0.0.1',
+      user: KIM,
+      input: annual('2026-11-16'),
+    });
     expect(
-      await codeOf(useCase.execute({ user: KIM, input: remote('2026-11-16') })),
+      await codeOf(
+        useCase.execute({
+          ip: '127.0.0.1',
+          user: KIM,
+          input: remote('2026-11-16'),
+        }),
+      ),
     ).toBe('OVERLAPPING_REQUEST');
   });
 
@@ -107,6 +128,7 @@ describe('CreateRequestUseCase', () => {
     expect(
       await codeOf(
         useCase.execute({
+          ip: '127.0.0.1',
           user: KIM,
           input: { ...remote('2026-11-17'), ip: '10.0.0' },
         }),
@@ -118,6 +140,7 @@ describe('CreateRequestUseCase', () => {
     expect(
       await codeOf(
         useCase.execute({
+          ip: '127.0.0.1',
           user: KIM,
           input: {
             ...remote('2026-11-16'),
@@ -131,8 +154,13 @@ describe('CreateRequestUseCase', () => {
 
   describe('재택 월 2회 한도 (예외 신청, ATT-29)', () => {
     it('그달 2회까지는 일반 신청이다', async () => {
-      await useCase.execute({ user: KIM, input: remote('2026-11-16') });
+      await useCase.execute({
+        ip: '127.0.0.1',
+        user: KIM,
+        input: remote('2026-11-16'),
+      });
       const r = await useCase.execute({
+        ip: '127.0.0.1',
         user: KIM,
         input: remote('2026-11-17'),
       });
@@ -141,10 +169,12 @@ describe('CreateRequestUseCase', () => {
 
     it('3회째는 거부하지 않고 사유를 받아 예외 신청으로 접수한다', async () => {
       await useCase.execute({
+        ip: '127.0.0.1',
         user: KIM,
         input: remote('2026-11-16', '2026-11-17'),
       });
       const r = await useCase.execute({
+        ip: '127.0.0.1',
         user: KIM,
         input: remote('2026-11-18', '2026-11-18', '아이가 아파서'),
       });
@@ -153,24 +183,34 @@ describe('CreateRequestUseCase', () => {
 
     it('예외 신청분도 그달 재택 횟수에 들어간다 (3일 예외 뒤 1일 더 → 또 예외, A10)', async () => {
       await useCase.execute({
+        ip: '127.0.0.1',
         user: KIM,
         input: remote('2026-11-16', '2026-11-18', '이사'),
       });
       expect(
         await codeOf(
-          useCase.execute({ user: KIM, input: remote('2026-11-19') }),
+          useCase.execute({
+            ip: '127.0.0.1',
+            user: KIM,
+            input: remote('2026-11-19'),
+          }),
         ),
       ).toBe('OVER_LIMIT_REASON_REQUIRED');
     });
 
     it('예외 신청에 사유가 없으면 OVER_LIMIT_REASON_REQUIRED', async () => {
       await useCase.execute({
+        ip: '127.0.0.1',
         user: KIM,
         input: remote('2026-11-16', '2026-11-17'),
       });
       expect(
         await codeOf(
-          useCase.execute({ user: KIM, input: remote('2026-11-18') }),
+          useCase.execute({
+            ip: '127.0.0.1',
+            user: KIM,
+            input: remote('2026-11-18'),
+          }),
         ),
       ).toBe('OVER_LIMIT_REASON_REQUIRED');
     });
@@ -181,6 +221,7 @@ describe('CreateRequestUseCase', () => {
         input: remote('2026-11-16', '2026-11-17'),
       });
       const r = await useCase.execute({
+        ip: '127.0.0.1',
         user: LEAD,
         input: remote('2026-11-18', '2026-11-18', '외부 미팅'),
       });
@@ -193,6 +234,7 @@ describe('CreateRequestUseCase', () => {
       expect(
         await codeOf(
           useCase.execute({
+            ip: '127.0.0.1',
             user: KIM,
             input: {
               type: 'HALF_OFF',
@@ -220,6 +262,7 @@ describe('CreateRequestUseCase', () => {
         },
       ]);
       const r = await useCase.execute({
+        ip: '127.0.0.1',
         user: KIM,
         input: {
           type: 'HALF_OFF',
@@ -235,6 +278,24 @@ describe('CreateRequestUseCase', () => {
         grantId: ledger.rows[0].props.id,
         requestDayId: r.days[0].id,
       });
+    });
+  });
+
+  it('신청하면 REQUEST_CREATE 이력에 자동 승인·예외 여부를 남긴다', async () => {
+    await useCase.execute({
+      user: LEAD,
+      input: annual('2026-11-16'),
+      ip: '127.0.0.1',
+    });
+    expect(audit.rows[0]).toMatchObject({
+      actorId: LEAD.id,
+      action: 'REQUEST_CREATE',
+      targetType: 'Request',
+      ip: '127.0.0.1',
+      payload: expect.objectContaining({
+        autoApproved: true,
+        isOverLimit: false,
+      }) as unknown,
     });
   });
 });
