@@ -1,0 +1,417 @@
+# 설계: 데이터 모델, 구조, API, ADR
+
+> **API 구조 확정 (2026-11-12, 11-13 리드 경로 분리).** 이 문서의 API 목록·요청·응답·에러 코드를 기준으로 구현한다. 바꿔야 할 때는 이 문서를 먼저 고친 뒤 코드를 고친다.
+> 제도 해석과 근거는 [decisions.md](./decisions.md).
+
+## 핵심 설계 방향
+
+- **현재 상태와 이력을 나눈다:** Attendance·Request는 지금 상태, 변화의 기록은 AuditLog·LeaveLedger
+- **기록은 지우지 않는다:** 원장·이력은 추가만, 사용자·연구실 IP는 소프트 삭제
+- **"날짜"와 "순간"을 구분한다:** 근무일·대상일은 `YYYY-MM-DD`(KST) 문자열, 출퇴근 같은 순간은 UTC
+- **선택지는 enum, 독립적인 예/아니오만 Boolean**
+- **규칙 강제는 화면이 아니라 서버가:** 미기록 퇴근 입력, 권한, 기한은 모두 서버가 판단
+- **Clock 주입:** 모든 "현재 시각"은 서버의 Clock에서. 개발 모드에서 시각 변경 가능
+- **정책 계층 분리:** 지각·조퇴·근무시간·기한·한도 판정은 순수 함수
+
+## ERD
+
+```mermaid
+erDiagram
+    User ||--o{ Attendance : "출퇴근"
+    User ||--o{ Request : "신청"
+    User ||--o{ LeaveLedger : "잔여 원장"
+    User ||--o{ AuditLog : "행위자"
+    Request ||--|{ RequestDay : "날짜별 행"
+    RequestDay |o--o| Attendance : "그날 근무"
+    RequestDay |o--o{ LeaveLedger : "사용·복원 근거"
+    LeaveLedger |o--o{ LeaveLedger : "OFF 지급건 참조"
+
+    User {
+        int id PK
+        string loginId UK
+        string passwordHash "bcrypt"
+        string name
+        Role role "MEMBER | LEAD"
+        string joinDate "YYYY-MM-DD"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable, 소프트 삭제"
+    }
+    Attendance {
+        int id PK
+        int userId FK
+        string workDate "YYYY-MM-DD (KST)"
+        DayType dayType "FULL_DAY | HALF_DAY_OFF | EMERGENCY_WORK | WEEKEND_WORK"
+        datetime checkInAt "UTC, 서버 시각"
+        datetime checkOutAt "nullable"
+        CheckOutSource checkOutSource "nullable, BUTTON | MANUAL"
+        boolean isLate
+        boolean isEarlyLeave "nullable = 판정 전"
+        int workedMinutes "nullable"
+        int requestDayId FK "nullable"
+        string checkInIp
+        string checkOutIp "nullable"
+        datetime createdAt
+        datetime updatedAt
+    }
+    Request {
+        int id PK
+        int userId FK
+        RequestType type "ANNUAL | REMOTE | HALF_OFF | WEEKEND_WORK"
+        string startDate "YYYY-MM-DD"
+        string endDate "YYYY-MM-DD"
+        RequestStatus status "PENDING | APPROVED | REJECTED | CANCELED"
+        boolean isOverLimit "재택 한도 초과 예외 신청"
+        string reason
+        string ip "nullable, REMOTE·WEEKEND_WORK"
+        string startTime "nullable, HH:mm"
+        string endTime "nullable, HH:mm"
+        int decidedById FK "nullable"
+        datetime decidedAt "nullable"
+        string rejectReason "nullable"
+        datetime createdAt
+        datetime updatedAt
+    }
+    RequestDay {
+        int id PK
+        int requestId FK
+        int userId FK
+        string date "YYYY-MM-DD"
+        DayStatus status "ACTIVE | CANCELED"
+        CancelType cancelType "nullable, SELF_BEFORE_DEADLINE | LEAD_SAME_DAY"
+        int canceledById FK "nullable"
+        datetime canceledAt "nullable"
+        string cancelReason "nullable"
+        datetime createdAt
+        datetime updatedAt
+    }
+    LeaveLedger {
+        int id PK
+        int userId FK
+        LeaveKind kind "ANNUAL | HALF_OFF"
+        LedgerEvent event "ACCRUE | USE | EXPIRE | RESTORE"
+        int halfDays "0.5일 = 1, 부호 포함"
+        string effectiveDate "YYYY-MM-DD"
+        string expiresOn "nullable, HALF_OFF ACCRUE만"
+        int grantId FK "nullable, OFF 지급건"
+        int requestDayId FK "nullable"
+        string dedupKey UK "nullable, 적립·만료 중복 방지"
+        datetime createdAt "추가만, 수정·삭제 없음"
+    }
+    AuditLog {
+        int id PK
+        int actorId FK "nullable"
+        AuditAction action
+        string targetType
+        int targetId
+        json payload
+        string ip
+        datetime occurredAt "Clock 기준"
+        datetime createdAt "실제 시각"
+    }
+    AllowedIp {
+        int id PK
+        string ip "정규화된 값, 살아 있는 것 중 중복 불가(유스케이스 확인)"
+        string label
+        int createdById FK "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable, 소프트 삭제"
+    }
+```
+
+## 테이블별 설계 이유
+
+### User
+- `loginId`는 이름과 분리 (동명이인). `passwordHash`는 bcrypt 해시만 저장 (원문 복원 불가 → 비밀번호는 "찾기"가 아니라 "재설정")
+- `role` 하나로 리드·팀원 구분. 리드도 출퇴근하므로 별도 테이블 없음
+- `joinDate`는 문자열: DateTime이면 KST 자정이 UTC 전날로 바뀌어 날짜가 밀리는 버그 위험
+- `deletedAt` 소프트 삭제: 퇴사자의 기록·원장·이력이 가리키는 대상이 사라지지 않게
+
+### Attendance (한 사람의 하루 = 한 줄)
+- `@@unique([userId, workDate])`: 출근 버튼 연타·동시 요청을 DB가 최종 차단
+- `dayType`: 그날 적용할 규칙 (반일 OFF면 지각 판정 제외 등). 연차일은 출퇴근 기록 없음
+- 판정 결과(`isLate`, `isEarlyLeave`, `workedMinutes`) 저장: 그 시점 기준의 판정 보존 + 대시보드·정산 조회 단순화
+- `isEarlyLeave` null = 퇴근 전이라 판정 전 (퇴근·직접 입력 시 시스템이 자동 판정)
+- "미기록 퇴근 입력 남음"은 별도 필드 없이 **직전 근무일의 checkOutAt이 null인지**로 판단 → 서버가 항상 같은 답을 줌
+- 출퇴근 사건 하나하나는 AuditLog에, Attendance는 그날의 상태만
+
+### Request + RequestDay (정책은 기간, 저장은 날짜)
+- Request = 사용자가 낸 신청서 한 장 (기간, 승인 상태, 예외 여부). 네 종류를 한 테이블에: 신청 → 승인 → 취소 흐름과 기한 규칙이 같음
+- RequestDay = 신청이 실제로 적용되는 날짜 한 줄씩. 연차·재택은 기간 안의 **영업일만** 행 생성, 반일 OFF·주말 근무는 하루 한 줄
+- 본인 취소 = 모든 RequestDay를 CANCELED + Request를 CANCELED (`SELF_BEFORE_DEADLINE`)
+- 리드 당일 취소 = 그날 RequestDay 하나만 CANCELED (`LEAD_SAME_DAY`), Request는 APPROVED 유지 → 그날은 긴급 출근
+- `isOverLimit`: 재택 한도를 넘는 신청이면 true. 신청서 전체가 예외 신청이 되고, 자동 승인 대상이 아님(리드 본인 제외)
+- 잔여 차감·복원, 재택 월 한도, 팀 보드 조회는 모두 RequestDay 기준 (날짜 단위)
+- 중복 신청 방지: "같은 사람·같은 날·ACTIVE 행"은 하나여야 하지만 취소 행은 제외해야 해서 단순 유일 제약 불가 → 유스케이스에서 트랜잭션 안에 확인
+- `userId`를 RequestDay에도 둔 이유: 날짜별 중복 확인·팀 보드 조회 때 Request를 거치지 않고 바로 찾기 위해
+- 머리·상세 구조(주문서·주문 상품과 같은 패턴). 행이 늘어나도 차감·조회·당일 취소가 "행을 세거나 하나 바꾸기"로 끝남 (ADR-004)
+
+### LeaveLedger (통장 거래 내역처럼)
+- 잔여 = `halfDays` 합계. 숫자 하나로 저장하면 "왜 이 잔여인지" 설명 불가
+- `halfDays` 정수(1일 = 2, 반일 = 1): 소수 오차 없음, 연차 반차 확장 쉬움. 부호 포함이라 합산만 하면 됨
+- 사용·복원은 **날짜(RequestDay) 단위로 한 줄씩**: 리드 당일 취소 시 그날 것만 복원
+- `grantId` 자기 참조: 반일 OFF는 지급분마다 만료일이 달라, 어느 지급분을 쓰고 만료됐는지 연결 (만료 임박 순 사용, 안 쓴 것만 만료)
+- `dedupKey` 유일: 적립·만료는 조회 시점에 "생겼어야 할 것"을 계산해 넣으므로 중복 실행을 DB가 차단. Clock을 앞뒤로 옮겨도 결과 동일. 예: `ACCRUE:ANNUAL:3:2026-02-01`
+- null 규칙(ACCRUE엔 grantId 없음, OFF의 USE엔 반드시 있음)은 코드와 테스트로 보장
+
+### AuditLog
+- `actorId` null = 로그인 실패·IP 차단처럼 아직 누군지 모르는 경우
+- `targetType + targetId`: 여러 테이블을 가리키므로 FK 없음 (이력·대상 모두 지우지 않아 문제없음)
+- `payload` Json: 행동마다 남길 내용이 다름 (SQLite Json은 Prisma 6.2+)
+- 시각 두 개: `occurredAt`(Clock 기준 업무 시각), `createdAt`(실제 기록 시각) → 시각을 바꿔 테스트한 기록인지 구분
+
+### AllowedIp
+- 연구실 IP 상시 허용 목록. 시드 `127.0.0.1`. 리드가 API로 관리
+- `ip`는 정규화해서 저장 (`::ffff:127.0.0.1` → `127.0.0.1`, `::1` → 로컬호스트, 앞뒤 공백 제거)
+- 재택·주말 근무 IP는 날짜·시간대에 묶여 있어 Request에
+
+### 테이블로 만들지 않은 것
+- 공휴일: `holidays/2026.json` (결정 4)
+- 재택 잔여 횟수: 이번 달 살아 있는 REMOTE RequestDay 수로 계산 (따로 저장하면 숫자가 어긋날 위험)
+- 현재 시각 변경값: 서버 메모리 (재시작 시 원래 시각으로)
+
+## 생성·수정·삭제 시각과 "취소 vs 삭제" 원칙
+
+| 테이블 | createdAt | updatedAt | deletedAt | 이유 |
+| --- | --- | --- | --- | --- |
+| User | O | O | O | 퇴사자는 소프트 삭제 (기록이 가리키는 대상 보존) |
+| Attendance | O | O | X | 퇴근·직접 입력으로 같은 줄이 바뀜. 근무 기록은 삭제하지 않음 |
+| Request | O | O | X | 대기 → 승인·반려·취소로 상태가 바뀜. 삭제 대신 "취소" 상태 |
+| RequestDay | O | O | X | 리드 당일 취소로 상태가 바뀜. 삭제 대신 "취소" 상태 |
+| LeaveLedger | O | X | X | 통장 거래 내역처럼 한 번 쓰면 고치지 않음. updatedAt을 일부러 빼 "수정 불가" 설계를 드러냄 |
+| AuditLog | O (+ occurredAt) | X | X | 이력은 추가만 |
+| AllowedIp | O | O | O | 삭제 API는 소프트 삭제. 삭제된 IP를 다시 추가할 수 있도록 `ip` 유일 제약을 빼고, 살아 있는 것 중 중복은 유스케이스에서 확인 |
+
+- **updatedAt과 AuditLog의 역할 분리:** updatedAt은 "마지막으로 바뀐 때"(빠른 확인용), AuditLog는 "언제·누가·무엇을·어떤 값에서 어떤 값으로"(상세 추적용)
+- **기술 시각은 실제 시각, 업무 시각은 Clock:** createdAt·updatedAt·deletedAt은 Prisma `@default(now())`·`@updatedAt`이 넣는 실제 서버 시각. 출근 시각·대상일·occurredAt 같은 업무 시각은 Clock 기준
+- **취소(CANCELED)는 실제로 일어난 업무 사건**이라 상태로 남김. 통계(취소율, 긴급 출근 횟수)에 쓰이고 원장의 RESTORE가 취소된 RequestDay를 가리킴. 소프트 삭제로 바꾸면 "취소"와 "실수로 지운 것"이 섞여 통계가 깨짐
+- **소프트 삭제는 "목록에서 빠져야 하는 대상"에만:** User(퇴사), AllowedIp(사용 중지). 조회 시 항상 `deletedAt: null`
+- **화면 정리는 조회 필터로:** 신청 목록 기본은 `status != CANCELED`, "취소 포함 보기" 토글
+- **인덱스:** Request `(userId, status)`, `(status, startDate)` / RequestDay `(userId, date, status)`, `(date, status)` / Attendance `(workDate)` / LeaveLedger `(userId, kind)` / AuditLog `(actorId, occurredAt)`, `(occurredAt)`
+
+## Enum 목록
+
+| Enum | 값 |
+| --- | --- |
+| Role | MEMBER, LEAD |
+| DayType | FULL_DAY, HALF_DAY_OFF, EMERGENCY_WORK, WEEKEND_WORK |
+| CheckOutSource | BUTTON, MANUAL |
+| RequestType | ANNUAL, REMOTE, HALF_OFF, WEEKEND_WORK |
+| RequestStatus | PENDING, APPROVED, REJECTED, CANCELED |
+| DayStatus | ACTIVE, CANCELED |
+| CancelType | SELF_BEFORE_DEADLINE, LEAD_SAME_DAY |
+| LeaveKind | ANNUAL, HALF_OFF |
+| LedgerEvent | ACCRUE, USE, EXPIRE, RESTORE |
+| AuditAction | CHECK_IN, CHECK_OUT, MANUAL_CHECK_OUT, REQUEST_CREATE, REQUEST_CANCEL, REQUEST_DAY_CANCEL, REQUEST_APPROVE, REQUEST_REJECT, LOGIN, LOGIN_FAIL, IP_BLOCKED, ALLOWED_IP_ADD, ALLOWED_IP_DELETE, CLOCK_CHANGE |
+
+SQLite는 enum 타입이 없어 문자열(TEXT)로 저장되고, 검증은 세 겹: TypeScript 타입 → API 입력(`@IsEnum`) → Prisma Client. DB 수준 강제가 필요하면 CHECK 제약조건 또는 PostgreSQL 전환.
+
+## 디렉토리 구조 (헥사고날, 레이어 먼저)
+
+- 레이어가 먼저(app / domain / infrastructure / common), app 아래는 기능별 폴더, 그 안에서 역할별 디렉토리
+- **1:1:1 매핑:** Controller 하나 = API 하나 = UseCase 하나 (dto도 기능명 그대로 하나)
+- **리드 전용 기능은 `app/lead/` 아래**, API 경로도 `/lead/...`. 팀원·리드가 함께 쓰는 기능은 `app/` 바로 아래
+- **저장소는 인터페이스와 구현을 분리:** domain에는 abstract class(약속)만, Prisma 구현은 infrastructure. 모듈에서 `{ provide: XRepository, useClass: PrismaXRepository }`로 연결
+
+```
+backend/src/
+├── main.ts
+├── app.module.ts
+├── app/                                 Application 계층
+│   ├── use-case.interface.ts
+│   ├── auth/
+│   │   ├── controller/   login.controller.ts, get-me.controller.ts
+│   │   ├── dto/          login.dto.ts, get-me.dto.ts
+│   │   ├── use-case/     login.use-case.ts, get-me.use-case.ts
+│   │   └── auth.module.ts
+│   ├── attendance/
+│   │   ├── controller/   check-in, check-out, manual-check-out, get-today, get-my-month (.controller.ts)
+│   │   ├── dto/          check-in.dto.ts, manual-check-out.dto.ts, get-today.dto.ts …
+│   │   ├── use-case/     check-in.use-case.ts …
+│   │   └── attendance.module.ts
+│   ├── request/          create-request, get-my-requests, cancel-request
+│   ├── balance/          get-my-balance, get-my-ledger
+│   ├── dashboard/        get-team-board, get-my-missing-checkouts
+│   ├── dev/              get-clock, set-clock, reset-clock (개발 모드에서만 모듈 등록)
+│   └── lead/                            리드 전용 (@Roles('LEAD'))
+│       ├── approval/     get-pending-requests, approve-request, reject-request, cancel-request-day
+│       ├── allowed-ip/   get-allowed-ips, add-allowed-ip, delete-allowed-ip
+│       ├── attendance/   get-missing-checkouts (팀 전체)
+│       ├── balance/      get-user-ledger
+│       ├── audit-log/    get-audit-logs
+│       └── settlement/   get-monthly-settlement (선택)
+├── domain/                              Domain 계층 (Nest·Prisma import 금지)
+│   ├── entity/           user, attendance, request, request-day, ledger-entry, allowed-ip, audit-log (.entity.ts)
+│   ├── repository/       *.repository.ts  ← abstract class (인터페이스)
+│   ├── policy/           attendance.policy.ts, request.policy.ts, balance.policy.ts  ← 순수 함수
+│   ├── port/             clock.port.ts
+│   ├── value/            work-date.ts, half-days.ts, paging.ts
+│   └── exception/        custom.exception.ts, error-code.ts, attendance.exception.ts, request.exception.ts …
+├── infrastructure/                      Infrastructure 계층
+│   ├── prisma/
+│   │   ├── prisma.service.ts, prisma.module.ts
+│   │   ├── repository/   prisma-attendance.repository.ts …  ← 구현
+│   │   ├── mapper/       attendance.mapper.ts …  (Prisma 모델 ↔ 엔티티)
+│   │   └── repository.module.ts  (인터페이스 ↔ 구현 연결)
+│   ├── query/            team-board.query.ts, settlement.query.ts  (조회 전용)
+│   ├── clock/            system.clock.ts, overridable.clock.ts  (clock.port 구현)
+│   └── token/            jwt-token.service.ts
+├── common/
+│   ├── decorators/       current-user, roles
+│   ├── filters/          domain-exception.filter.ts  → { error: { code, message } }
+│   ├── guards/           ip.guard.ts, jwt-auth.guard.ts, roles.guard.ts
+│   ├── interceptors/     response.interceptor.ts  → { data }
+│   ├── pipes/            validation
+│   └── utils/            ip.util.ts, business-day.util.ts, holidays/2026.json
+└── config/
+```
+
+| 계층 | 디렉토리 | 하는 일 | 하지 않는 일 |
+| --- | --- | --- | --- |
+| app | controller/ | HTTP 요청 → UseCase 호출 → 응답 | 업무 판단, DB 접근 |
+| app | dto/ | 기능별 Request·Result 정의, class-validator 검증, `static from(entity)` | 업무 로직 |
+| app | use-case/ | 흐름 조립(조회 → 엔티티·정책에 판정 맡김 → 저장 → 이력), `@Transactional()` | 규칙 계산, Prisma 직접 사용 |
+| domain | entity/ | 상태와 자기 규칙 (`attendance.checkOut(now)`, `request.approve(lead)`) | Nest·Prisma 의존 |
+| domain | policy/ | 여러 엔티티에 걸친 판정, 순수 함수 | 부수 효과 |
+| domain | repository/ | 저장소 약속(abstract class) | 구현 |
+| domain | port/ | 외부 의존의 약속 (Clock) | 구현 |
+| infrastructure | prisma/repository, mapper | 약속의 Prisma 구현, 모델 ↔ 엔티티 변환 | 업무 판단 |
+| infrastructure | query/ | 여러 테이블을 읽기만 하는 조회 (팀 보드, 정산) | 쓰기 |
+| common | guards, filters, interceptors … | 인증·권한·IP, 응답·에러 형식 | 업무 판단 |
+
+**의존 방향:** app → domain ← infrastructure. domain은 아무것도 import하지 않는다.
+
+## 테스트 전략
+
+| 층 | 대상 | DB | 비중 |
+| --- | --- | --- | --- |
+| 단위 | domain의 policy·entity ("10:00:01은 지각", "금~월 연차는 2일 차감") | 필요 없음 (순수 함수) | 약 70% |
+| 유스케이스 | app의 use-case 흐름 | 필요 없음 (`InMemoryXRepository` 또는 jest mock) | 약 20% |
+| 통합(e2e) | 실제 API → 가드 → Prisma → SQLite | 테스트용 SQLite 파일 | 약 10%, 핵심 흐름만 |
+
+통합 테스트 핵심 흐름: 출근 → 퇴근 → 판정 / 신청 → 승인 → 원장 차감 → 취소 → 복원 / 허용되지 않은 IP는 403 / 미기록 퇴근이 남으면 퇴근 거부
+
+경계값 테스트 필수: 06:59:59/07:00:00, 10:00:00/10:00:01, 15:59:59/16:00:00, 17:00:00/17:00:01
+
+## API 목록 (확정)
+
+**공통 규칙**
+- 모든 요청은 IpGuard를 통과해야 한다. 로그인 외에는 JWT(12시간) 필요, 만료·누락 시 401
+- 응답: 성공은 `{ data }`, 실패는 `{ error: { code, message } }`
+- 날짜 파라미터는 `YYYY-MM-DD`(KST), 시각은 ISO 8601
+- 모든 시각 판정은 서버 Clock 기준. 브라우저가 보낸 "현재 시각"은 받지 않음
+- `/lead/...` 경로는 리드 전용 (`@Roles('LEAD')`, 팀원은 403 `FORBIDDEN_ROLE`)
+
+| 영역 | Method | Path | 설명 | 권한 | 관련 FR |
+| --- | --- | --- | --- | --- | --- |
+| 인증 | POST | /auth/login | 로그인 `{ loginId, password }` → `{ accessToken, user }` | 모두 | FR-SYS-02 |
+| 인증 | GET | /auth/me | 내 정보와 역할 | 로그인 | FR-SYS-02 |
+| 출퇴근 | GET | /attendance/today | 오늘 내 기록, 근무일 유형, 정상 퇴근 가능 시각, `pendingManualCheckouts` | 로그인 | FR-DSH-01, FR-ATT-03 |
+| 출퇴근 | POST | /attendance/check-in | 출근. **항상 즉시 기록**(서버 시각), 응답에 `pendingManualCheckouts` 포함 | 로그인 | FR-ATT-01, 04 |
+| 출퇴근 | POST | /attendance/:id/manual-check-out | 미기록 퇴근 직접 입력 `{ checkOutAt }` | 본인 | FR-ATT-03 |
+| 출퇴근 | POST | /attendance/check-out | 퇴근. 미기록 퇴근이 남아 있으면 `PENDING_MANUAL_CHECKOUT`로 거부 | 로그인 | FR-ATT-02, 04 |
+| 출퇴근 | GET | /attendance/me?month= | 내 월별 기록 | 로그인 | FR-DSH-01 |
+| 신청 | POST | /requests | 신청 `{ type, startDate, endDate, reason, ip?, startTime?, endTime? }`. 반일 OFF·주말 근무는 startDate = endDate. 재택 한도 초과면 `isOverLimit: true`로 접수 | 로그인 | FR-REQ-01 |
+| 신청 | GET | /requests/me | 내 신청 목록 (날짜별 상태 포함) | 로그인 | FR-REQ-01 |
+| 신청 | POST | /requests/:id/cancel | 본인 전체 취소 (시작일의 직전 영업일 17:00:00까지) | 본인 | FR-REQ-01 |
+| 잔여 | GET | /balances/me | 연차·OFF(만료일 포함) 잔여, 이번 달 재택 `used/2 + 예외 n회` | 로그인 | FR-BAL-01 |
+| 잔여 | GET | /balances/me/ledger | 내 원장 내역 | 로그인 | FR-BAL-01 |
+| 대시보드 | GET | /dashboard/team?date= | 팀원별 그날 상태. 팀원은 상태만, 리드는 시각·지각·조퇴·10시 경과 미출근 포함 | 로그인 | FR-DSH-01 |
+| 대시보드 | GET | /dashboard/me/missing | 내 퇴근 미기록·직접 입력 건 | 로그인 | FR-DSH-01 |
+| 리드 | GET | /lead/requests?status=PENDING | 대기 목록 (시작일 가까운 순, 예외 신청 표시) | 리드 | FR-REQ-02 |
+| 리드 | POST | /lead/requests/:id/approve | 승인 | 리드 | FR-REQ-02 |
+| 리드 | POST | /lead/requests/:id/reject | 반려 `{ rejectReason }` | 리드 | FR-REQ-02 |
+| 리드 | POST | /lead/requests/:id/days/:date/cancel | 당일 취소 `{ cancelReason }` → 그날 긴급 출근 | 리드 | FR-REQ-01 |
+| 리드 | GET | /lead/missing-checkouts | 팀 전체 퇴근 미기록·직접 입력 건 | 리드 | FR-DSH-01 |
+| 리드 | GET | /lead/users/:userId/ledger | 팀원 원장 내역 | 리드 | FR-BAL-01 |
+| 리드 | GET | /lead/allowed-ips | 연구실 IP 목록 | 리드 | FR-SYS-01 |
+| 리드 | POST | /lead/allowed-ips | 추가 `{ ip, label }` (형식 검사·정규화) | 리드 | FR-SYS-01 |
+| 리드 | DELETE | /lead/allowed-ips/:id | 소프트 삭제 (현재 접속 IP·마지막 IP 불가) | 리드 | FR-SYS-01 |
+| 리드 | GET | /lead/audit-logs?userId=&from=&to= | 인터랙션 이력 | 리드 | FR-LOG-01 |
+| 리드 | GET | /lead/settlements?month= | 월별 정산 (선택) | 리드 | FR-STL-01 |
+| 개발 | GET / PUT / DELETE | /dev/clock | 현재 시각 조회·변경·초기화 | 개발 모드 | 참고사항 |
+
+**미기록 퇴근 흐름**
+
+```
+출근 버튼 → POST /attendance/check-in
+  → 출근 즉시 기록, 응답 { attendance, pendingManualCheckouts: [{ id, workDate, checkInAt }] }
+  → 목록이 비어 있지 않으면 ManualCheckOutModal (이름·날짜 표시, 닫기 없음, 로그아웃 링크)
+  → 새로고침·재로그인·다른 기기: GET /attendance/today 가 다시 알려 줌 → 창이 다시 뜸
+  → POST /attendance/:id/manual-check-out { checkOutAt }  (그날 출근 시각 ~ 23:59:59)
+  → 입력 전 퇴근 요청은 서버가 PENDING_MANUAL_CHECKOUT 으로 거부
+```
+
+**IP 차단 흐름:** 403 `IP_NOT_ALLOWED` → 화면에 "등록된 IP가 아닙니다 (현재 IP: x.x.x.x)" 안내 페이지
+
+## 도메인 에러 코드 (확정)
+
+| 코드 | HTTP | 상황 |
+| --- | --- | --- |
+| UNAUTHORIZED | 401 | 토큰 없음·만료 |
+| FORBIDDEN_ROLE | 403 | 권한 없음 (팀원이 리드 기능 호출) |
+| IP_NOT_ALLOWED | 403 | 허용되지 않은 IP 또는 시간대 |
+| INVALID_CREDENTIALS | 401 | 로그인 실패 |
+| CHECK_IN_TOO_EARLY | 422 | 07:00:00 이전 출근 |
+| ALREADY_CHECKED_IN | 409 | 중복 출근 |
+| NOT_CHECKED_IN | 409 | 출근 없이 퇴근 |
+| CHECK_OUT_TOO_EARLY | 422 | 16:00:00 이전 퇴근 (반일 OFF 날 제외) |
+| PENDING_MANUAL_CHECKOUT | 409 | 미기록 퇴근 입력 전 퇴근 시도 |
+| MANUAL_CHECKOUT_OUT_OF_RANGE | 422 | 직접 입력 시각이 출근~23:59:59 밖 |
+| INVALID_DATE_RANGE | 422 | 종료일이 시작일보다 이르거나, 하루만 가능한 종류에 기간을 넣음 |
+| NO_BUSINESS_DAY_IN_RANGE | 422 | 연차·재택 기간에 영업일이 하나도 없음 |
+| REQUEST_DEADLINE_PASSED | 422 | 시작일의 직전 영업일 17:00:00 이후 신청·본인 취소 |
+| INSUFFICIENT_BALANCE | 422 | 연차·OFF 잔여 부족 |
+| WEEKEND_WORK_NOT_HOLIDAY | 422 | 영업일에 주말·공휴일 근무 신청 |
+| OVERLAPPING_REQUEST | 409 | 이미 신청이 있는 날짜와 겹침 |
+| SAME_DAY_CANCEL_LEAD_ONLY | 403 | 팀원의 당일 취소 시도 |
+| INVALID_STATUS_TRANSITION | 409 | 이미 처리된 신청 승인·반려·취소 |
+| INVALID_IP_FORMAT | 422 | IP 형식 오류 (연구실 IP, 재택·주말 근무 신청) |
+| CANNOT_DELETE_CURRENT_IP | 409 | 현재 접속 중인 IP 삭제 시도 |
+| CANNOT_DELETE_LAST_IP | 409 | 마지막 남은 연구실 IP 삭제 시도 |
+| VALIDATION_FAILED | 400 | 입력 형식 오류 (DTO 검증) |
+
+재택 한도 초과는 에러가 아니라 예외 신청(`isOverLimit: true`)으로 접수된다.
+
+## ADR (설계 결정 기록)
+
+### ADR-001 DB: SQLite + Prisma
+- **결정:** SQLite 파일 DB, ORM은 Prisma
+- **이유:** 평가자가 별도 설치 없이 실행 가능 (과제 필수 조건). Prisma 스키마는 읽기 쉽고 `prisma studio`로 데이터를 바로 볼 수 있음. Prisma 6.2+는 SQLite에서도 enum·Json 지원
+- **대안:** PostgreSQL + Docker (평가자 환경에 Docker 필요), JSON 파일 (조회·제약조건을 직접 구현해야 함)
+- **감수한 점:** 동시 쓰기에 약함, DB 수준 enum 강제 없음 → 4명 규모에서는 문제없고, 검증은 앱에서 세 겹
+
+### ADR-002 잔여는 원장으로 관리
+- **결정:** 잔여 숫자를 저장하지 않고 ACCRUE·USE·EXPIRE·RESTORE 이벤트 합산
+- **이유:** "왜 이 잔여인가"를 언제든 설명 가능, 취소·반려 시 기록을 지우지 않음(FR-LOG-01), OFF별 만료일 추적 가능
+- **감수한 점:** 조회 시 합산 필요 → 사용자당 이벤트 수가 적어 문제없음
+
+### ADR-003 Clock 주입
+- **결정:** `Date.now()` 대신 주입된 Clock(domain/port의 약속, infrastructure/clock의 구현) 사용, 개발 모드에서 시각 변경 API 제공
+- **이유:** 과제 참고사항 권장, 07:00·10:00:00·17:00:00 같은 경계를 테스트와 시연에서 재현 가능
+- **감수한 점:** 모든 유스케이스가 Clock에 의존 → 리뷰로 `new Date()` 직접 사용 금지
+
+### ADR-004 신청은 기간, 저장은 날짜 (Request + RequestDay)
+- **결정:** 사용자는 기간으로 신청·승인·전체 취소, 내부적으로는 영업일마다 RequestDay 행
+- **이유:** 신청한 단위 그대로 한 번에 취소하는 게 자연스러움. 동시에 리드 당일 취소(하루만), 영업일만 차감, 날짜별 팀 보드 조회는 날짜 단위가 필요
+- **대안:** 1건 = 하루 (신청·승인·취소 반복으로 번거로움) / 기간만 저장 (연차 중간 하루 긴급 출근 시 기간 전체를 취소해야 하고 남은 날은 기한이 지나 재신청 불가) / 기간 + 예외만 기록 (줄 수는 적지만 "기간 → 영업일" 계산이 코드로 흩어져 버그 지점이 늘고, 공휴일 데이터가 바뀌면 승인된 연차의 차감 일수가 달라질 수 있음)
+- **감수한 점:** 테이블 하나 추가, 신청 시 영업일 계산 필요
+
+### ADR-005 미기록 퇴근은 서버 상태로 강제
+- **결정:** 출근은 버튼을 누른 순간 서버 시각으로 즉시 기록, 미기록 퇴근 입력은 서버가 "남음" 상태를 들고 있다가 화면에 강제, 입력 전 퇴근은 서버가 거부
+- **이유:** 급한 출근을 막지 않으면서(지각 방지) 잊지 않게 함. 새로고침·재로그인·다른 기기에서도 같은 결과, 브라우저 시계 조작 불가
+- **대안:** 입력이 끝나야 출근 처리 (회상 시간이 업무시간에서 빠지지만 입력하다 지각이 될 수 있음), 나중에 입력 허용 (다시 잊을 수 있음)
+- **감수한 점:** 회상 시간(보통 1분 이내)이 업무시간에 포함됨, API 호출 두 번
+
+### ADR-006 헥사고날 구조: 레이어 먼저, 1:1:1 매핑, 리드 경로 분리
+- **결정:** `app / domain / infrastructure / common` 레이어 먼저, app 아래 기능별 폴더에 controller·dto·use-case. Controller = API = UseCase 1:1:1. 리드 전용 기능은 `app/lead/`와 `/lead/...` 경로
+- **이유:** 이전 NestJS + Prisma 헥사고날 프로젝트에서 검증한 익숙한 구조라 빠르게 작업 가능. API 목록과 파일이 1:1로 대응해 코드를 찾기 쉬움. 리드 기능이 폴더와 경로에서 한눈에 구분됨
+- **대안:** 도메인 먼저(attendance/ 안에 모든 레이어) → 엔티티를 여러 기능이 공유하는 이 과제에서는 레이어 먼저가 더 자연스러움. 역할 구분 없이 가드만 사용 → 리드 기능이 코드에서 덜 드러남
+- **감수한 점:** 파일 수 증가, 한 기능을 고칠 때 app·domain·infrastructure를 오감
+
+### ADR-007 저장소는 인터페이스(domain)와 Prisma 구현(infrastructure)으로 분리
+- **결정:** domain/repository에는 abstract class만, infrastructure/prisma/repository에 Prisma 구현, 모듈에서 연결
+- **이유:** **의존성 역전 원칙(DIP).** 업무 규칙(domain)이 세부 도구(Prisma·Nest)에 기대지 않고 둘 다 약속(인터페이스)에 기대게 함. domain에는 프레임워크 import가 없어 "이 팀의 근태 제도"만 코드로 남고, ORM·DB를 바꾸거나(SQLite → PostgreSQL) 버전을 올려도 domain은 그대로 (과제가 요구한 "향후 확장을 고려한 설계"). 테스트는 jest mock 또는 메모리 가짜 저장소 모두 가능하며, 가짜 저장소는 상태를 기억해 "저장 → 조회" 흐름 테스트가 자연스러움
+- **대안:** domain의 저장소 클래스가 PrismaService를 직접 사용 → 파일이 적고 익숙하며 유스케이스 테스트도 jest mock으로 가능(테스트 가능성은 차이 없음). 다만 domain이 Prisma를 import해 DB·ORM 교체 시 domain도 수정해야 하고 헥사고날 원칙과 어긋남. 실용적 타협으로는 타당하지만, 이번에는 설계 의도를 끝까지 일관되게 지키는 쪽을 선택
+- **감수한 점:** 저장소마다 인터페이스 파일 하나 추가. Prisma 쿼리 자체의 정확성은 통합 테스트로 확인
