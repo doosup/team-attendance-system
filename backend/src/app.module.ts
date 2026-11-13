@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { AttendanceModule } from './app/attendance/attendance.module';
 import { AuthModule } from './app/auth/auth.module';
 import { DevModule } from './app/dev/dev.module';
 import { DomainExceptionFilter } from './common/filters/domain-exception.filter';
@@ -21,6 +22,7 @@ const isDev = process.env.NODE_ENV !== 'production';
     ClockModule,
     TokenModule,
     AuthModule,
+    AttendanceModule,
     ...(isDev ? [DevModule] : []),
   ],
   providers: [
