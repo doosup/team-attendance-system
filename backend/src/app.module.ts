@@ -6,6 +6,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { AttendanceModule } from './app/attendance/attendance.module';
 import { AuthModule } from './app/auth/auth.module';
 import { BalanceModule } from './app/balance/balance.module';
+import { DashboardModule } from './app/dashboard/dashboard.module';
 import { LeadModule } from './app/lead/lead.module';
 import { RequestModule } from './app/request/request.module';
 import { DevModule } from './app/dev/dev.module';
@@ -45,6 +46,7 @@ const isDev = process.env.NODE_ENV !== 'production';
     AuthModule,
     AttendanceModule,
     BalanceModule,
+    DashboardModule,
     RequestModule,
     LeadModule,
     ...(isDev ? [DevModule] : []),

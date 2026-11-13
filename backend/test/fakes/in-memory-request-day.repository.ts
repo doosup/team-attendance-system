@@ -89,4 +89,12 @@ export class InMemoryRequestDayRepository extends RequestDayRepository {
       ),
     );
   }
+
+  findByDate(date: string) {
+    return Promise.resolve(
+      this.all()
+        .filter((r) => r.date === date)
+        .map(({ date: _date, isOverLimit: _over, ...day }) => day),
+    );
+  }
 }

@@ -47,6 +47,25 @@ export class PrismaAttendanceRepository extends AttendanceRepository {
     });
   }
 
+  async findByDate(workDate: string) {
+    const rows = await this.tx.attendance.findMany({ where: { workDate } });
+    return rows.map((m) => AttendanceMapper.toEntity(m));
+  }
+
+  async findMissingOrManual(today: string, userId?: number) {
+    const rows = await this.tx.attendance.findMany({
+      where: {
+        userId,
+        OR: [
+          { checkOutAt: null, workDate: { lt: today } },
+          { checkOutSource: 'MANUAL' },
+        ],
+      },
+      orderBy: [{ workDate: 'desc' }, { userId: 'asc' }],
+    });
+    return rows.map((m) => AttendanceMapper.toEntity(m));
+  }
+
   async create(attendance: Attendance) {
     try {
       const m = await this.tx.attendance.create({

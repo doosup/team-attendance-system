@@ -14,6 +14,8 @@ import { ApproveRequestUseCase } from './approval/use-case/approve-request.use-c
 import { CancelRequestDayUseCase } from './approval/use-case/cancel-request-day.use-case';
 import { GetPendingRequestsUseCase } from './approval/use-case/get-pending-requests.use-case';
 import { RejectRequestUseCase } from './approval/use-case/reject-request.use-case';
+import { GetTeamMissingController } from './attendance/controller/get-team-missing.controller';
+import { GetTeamMissingUseCase } from './attendance/use-case/get-team-missing.use-case';
 import { GetAuditLogsController } from './audit-log/controller/get-audit-logs.controller';
 import { GetAuditLogsUseCase } from './audit-log/use-case/get-audit-logs.use-case';
 import { GetUserLedgerController } from './balance/controller/get-user-ledger.controller';
@@ -32,6 +34,7 @@ import { GetUserLedgerUseCase } from './balance/use-case/get-user-ledger.use-cas
     GetAllowedIpsController,
     AddAllowedIpController,
     DeleteAllowedIpController,
+    GetTeamMissingController,
   ],
   providers: [
     GetUserLedgerUseCase,
@@ -43,6 +46,7 @@ import { GetUserLedgerUseCase } from './balance/use-case/get-user-ledger.use-cas
     GetAllowedIpsUseCase,
     AddAllowedIpUseCase,
     DeleteAllowedIpUseCase,
+    GetTeamMissingUseCase,
   ],
 })
 export class LeadModule {}

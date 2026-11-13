@@ -43,6 +43,28 @@ export class InMemoryAttendanceRepository extends AttendanceRepository {
     return Promise.resolve();
   }
 
+  findByDate(workDate: string) {
+    return Promise.resolve(
+      this.rows
+        .filter((a) => a.props.workDate === workDate)
+        .map((a) => copy(a)!),
+    );
+  }
+
+  findMissingOrManual(today: string, userId?: number) {
+    return Promise.resolve(
+      this.rows
+        .filter(
+          (a) =>
+            (userId === undefined || a.props.userId === userId) &&
+            ((a.props.checkOutAt === null && a.props.workDate < today) ||
+              a.props.checkOutSource === 'MANUAL'),
+        )
+        .sort((a, b) => b.props.workDate.localeCompare(a.props.workDate))
+        .map((a) => copy(a)!),
+    );
+  }
+
   async create(attendance: Attendance) {
     const { userId, workDate } = attendance.props;
     if (await this.findByUserAndDate(userId, workDate)) {
