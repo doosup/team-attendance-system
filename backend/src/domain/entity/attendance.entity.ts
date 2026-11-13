@@ -68,6 +68,22 @@ export class Attendance {
     });
   }
 
+  /** 리드 당일 취소로 긴급 출근이 된 날: 지각·조퇴 판정을 없앤다 (A16) */
+  toEmergency(): void {
+    this.props.dayType = 'EMERGENCY_WORK';
+    this.props.isLate = false;
+    if (this.props.checkOutAt) {
+      Object.assign(
+        this.props,
+        judgeWork(
+          this.props.checkInAt,
+          this.props.checkOutAt,
+          'EMERGENCY_WORK',
+        ),
+      );
+    }
+  }
+
   get hasCheckedOut(): boolean {
     return this.props.checkOutAt !== null;
   }
