@@ -260,7 +260,7 @@ backend/src/
 │   │   ├── repository/   prisma-attendance.repository.ts …  ← 구현
 │   │   ├── mapper/       attendance.mapper.ts …  (Prisma 모델 ↔ 엔티티)
 │   │   └── repository.module.ts  (인터페이스 ↔ 구현 연결)
-│   ├── query/            team-board.query.ts, settlement.query.ts  (조회 전용)
+│   ├── query/            settlement.query.ts  (조회 전용, 선택 기능)
 │   ├── clock/            system.clock.ts, overridable.clock.ts  (clock.port 구현)
 │   └── token/            jwt-token.service.ts
 ├── common/
@@ -358,6 +358,11 @@ backend/src/
 - 업무 시각은 **초 단위로 자른다** (Clock 한 곳에서): ms 차이로 지각·조퇴가 갈리지 않게 (결정 원칙 3)
 - 바꾼 뒤에도 시간은 흐른다: 실제 시각과의 차이만 서버 메모리에 저장 (09:59:50으로 바꾸고 10초 뒤 = 10:00:00). 재시작·`DELETE` 시 실제 시각
 - 응답 (GET·PUT·DELETE 공통): `{ data: { now: "<ISO 8601 UTC>", overridden: boolean } }`
+
+**팀 보드 (`GET /dashboard/team?date=`)**
+- 상태: WORKING(출근) / LEFT(퇴근) / REMOTE(재택 근무 중) / ANNUAL(연차) / HALF_OFF(반일 OFF, 출근 전) / PENDING_APPROVAL(승인 대기) / NOT_CHECKED_IN(미출근) / DAY_OFF(주말·공휴일)
+- 판정은 `domain/policy/board.policy.ts` 순수 함수. 저장소의 날짜별 조회(출퇴근·신청 날짜)를 모아 넘긴다 → query 계층 없이도 테스트 가능해 팀 보드는 저장소를 쓴다
+- 팀원 응답은 `{ userId, name, status }`만, 리드는 근무 유형·출퇴근 시각·지각·조퇴·근무시간·직접 입력 여부·`pastTen`(10:00 지나도 미출근)까지
 
 **IP 검사 (IpGuard, 전역)**
 - 가드 순서: JwtAuthGuard → IpGuard → RolesGuard. 재택 IP는 신청한 본인에게만 열려야 해서 사용자를 먼저 안다

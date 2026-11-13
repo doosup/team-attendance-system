@@ -29,4 +29,8 @@ export abstract class RequestDayRepository {
     date: string,
     ip: string,
   ): Promise<{ userId: number; startTime: string; endTime: string }[]>;
+  // 그날 모든 사람의 신청 (팀 보드)
+  abstract findByDate(
+    date: string,
+  ): Promise<(DayRequest & { userId: number })[]>;
 }

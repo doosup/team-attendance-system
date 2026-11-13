@@ -57,7 +57,7 @@ config/
 - 의존 방향: app → domain ← infrastructure. domain은 아무것도 import하지 않음
 - 저장소: use-case는 `domain/repository`의 abstract class만 주입받음. 구현 연결은 `repository.module.ts`에서 `{ provide: XRepository, useClass: PrismaXRepository }`
 - 트랜잭션: use-case에 `@Transactional()` (nestjs-cls + Prisma 어댑터). 한 요청의 여러 저장소가 같은 트랜잭션 사용
-- 조회 예외: 팀 보드·미기록 목록·정산은 entity 없이 `infrastructure/query`에서 바로 조회
+- 조회 예외: 정산(선택)은 entity 없이 `infrastructure/query`에서 바로 조회. 팀 보드·미기록 목록은 저장소의 날짜별 조회 + 순수 정책(board.policy)으로
 - 테스트 3층: ① policy·entity 순수 단위 테스트(약 70%) ② use-case는 `InMemoryXRepository` 가짜 저장소로(약 20%) ③ 통합(e2e)은 테스트용 SQLite로 핵심 흐름만(약 10%: 출근→퇴근 판정, 신청→승인→차감→취소→복원, IP 403, 미기록 퇴근 시 퇴근 거부). `*.spec.ts`는 대상 파일 옆, e2e는 `test/`
 
 ## 데이터 모델 (상세·근거는 `docs/design.md`)
