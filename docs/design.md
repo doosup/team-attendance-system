@@ -343,6 +343,12 @@ backend/src/
   → 입력 전 퇴근 요청은 서버가 PENDING_MANUAL_CHECKOUT 으로 거부
 ```
 
+**개발용 시각 변경 (`/dev/clock`)**
+- `NODE_ENV`가 `production`이 아닐 때만 모듈을 등록한다 (아니면 404). 평가자의 `start:dev`에서는 켜져 있다
+- `PUT { "now": "2026-11-13T09:59:50+09:00" }`: 오프셋(`Z` 또는 `±hh:mm`)이 있는 ISO 8601만 허용, 아니면 400 `VALIDATION_FAILED`
+- 바꾼 뒤에도 시간은 흐른다: 실제 시각과의 차이만 서버 메모리에 저장 (09:59:50으로 바꾸고 10초 뒤 = 10:00:00). 재시작·`DELETE` 시 실제 시각
+- 응답 (GET·PUT·DELETE 공통): `{ data: { now: "<ISO 8601 UTC>", overridden: boolean } }`
+
 **IP 차단 흐름:** 403 `IP_NOT_ALLOWED` → 화면에 "등록된 IP가 아닙니다 (현재 IP: x.x.x.x)" 안내 페이지
 
 ## 도메인 에러 코드 (확정)
@@ -373,6 +379,8 @@ backend/src/
 | VALIDATION_FAILED | 400 | 입력 형식 오류 (DTO 검증) |
 
 재택 한도 초과는 에러가 아니라 예외 신청(`isOverLimit: true`)으로 접수된다.
+
+표에 없는 HTTP 오류(존재하지 않는 경로 등)는 상태 이름을 코드로 쓴다 (예: 404 `NOT_FOUND`). 예상하지 못한 오류는 500 `INTERNAL_ERROR`.
 
 ## ADR (설계 결정 기록)
 
