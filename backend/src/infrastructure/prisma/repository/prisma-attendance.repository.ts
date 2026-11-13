@@ -4,23 +4,28 @@ import { Attendance } from '../../../domain/entity/attendance.entity';
 import { CustomException } from '../../../domain/exception/custom.exception';
 import { AttendanceRepository } from '../../../domain/repository/attendance.repository';
 import { AttendanceMapper } from '../mapper/attendance.mapper';
-import { PrismaService } from '../prisma.service';
+import type { PrismaTx } from '../transaction';
+import { TransactionHost } from '@nestjs-cls/transactional';
 
 @Injectable()
 export class PrismaAttendanceRepository extends AttendanceRepository {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(private readonly txHost: TransactionHost) {
     super();
   }
 
+  private get tx() {
+    return (this.txHost as PrismaTx).tx;
+  }
+
   async findByUserAndDate(userId: number, workDate: string) {
-    const m = await this.prisma.attendance.findUnique({
+    const m = await this.tx.attendance.findUnique({
       where: { userId_workDate: { userId, workDate } },
     });
     return m && AttendanceMapper.toEntity(m);
   }
 
   async findLatestBefore(userId: number, workDate: string) {
-    const m = await this.prisma.attendance.findFirst({
+    const m = await this.tx.attendance.findFirst({
       where: { userId, workDate: { lt: workDate } },
       orderBy: { workDate: 'desc' },
     });
@@ -28,7 +33,7 @@ export class PrismaAttendanceRepository extends AttendanceRepository {
   }
 
   async findByUserAndMonth(userId: number, month: string) {
-    const rows = await this.prisma.attendance.findMany({
+    const rows = await this.tx.attendance.findMany({
       where: { userId, workDate: { startsWith: `${month}-` } },
       orderBy: { workDate: 'asc' },
     });
@@ -36,7 +41,7 @@ export class PrismaAttendanceRepository extends AttendanceRepository {
   }
 
   async save(attendance: Attendance) {
-    await this.prisma.attendance.update({
+    await this.tx.attendance.update({
       where: { id: attendance.id },
       data: AttendanceMapper.toData(attendance),
     });
@@ -44,7 +49,7 @@ export class PrismaAttendanceRepository extends AttendanceRepository {
 
   async create(attendance: Attendance) {
     try {
-      const m = await this.prisma.attendance.create({
+      const m = await this.tx.attendance.create({
         data: AttendanceMapper.toData(attendance),
       });
       return AttendanceMapper.toEntity(m);

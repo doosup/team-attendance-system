@@ -1,15 +1,18 @@
+import { Transactional } from '@nestjs-cls/transactional';
 import { Injectable } from '@nestjs/common';
 import { User } from '../../../domain/entity/user.entity';
 import { CustomException } from '../../../domain/exception/custom.exception';
 import { assertCheckOutTime } from '../../../domain/policy/attendance.policy';
+import { weekendWorkOffGrant } from '../../../domain/policy/balance.policy';
 import { Clock } from '../../../domain/port/clock.port';
 import { AttendanceRepository } from '../../../domain/repository/attendance.repository';
+import { LedgerRepository } from '../../../domain/repository/ledger.repository';
 import { workDateOf } from '../../../domain/value/work-date';
 import { UseCase } from '../../use-case.interface';
 import { AttendanceResult } from '../dto/check-in.dto';
 
 // 퇴근 버튼. 미기록 퇴근이 남아 있으면 서버가 거부한다 (ADR-005).
-// shortcut: 주말 근무 OFF 지급은 ATT-16, CHECK_OUT 이력은 ATT-6에서 연결.
+// shortcut: CHECK_OUT 이력은 ATT-6에서 연결.
 @Injectable()
 export class CheckOutUseCase implements UseCase<
   { user: User; ip: string },
@@ -18,8 +21,10 @@ export class CheckOutUseCase implements UseCase<
   constructor(
     private readonly clock: Clock,
     private readonly attendances: AttendanceRepository,
+    private readonly ledger: LedgerRepository,
   ) {}
 
+  @Transactional()
   async execute({
     user,
     ip,
@@ -41,6 +46,16 @@ export class CheckOutUseCase implements UseCase<
     assertCheckOutTime(now, today.props.dayType);
     today.checkOut(now, 'BUTTON', ip);
     await this.attendances.save(today);
+    if (today.props.dayType === 'WEEKEND_WORK') {
+      await this.ledger.append([
+        weekendWorkOffGrant({
+          userId: user.id,
+          attendanceId: today.id,
+          workDate: today.props.workDate,
+          requestDayId: today.props.requestDayId,
+        }),
+      ]);
+    }
     return AttendanceResult.from(today);
   }
 }

@@ -2,6 +2,7 @@ import { CustomException } from '../../../domain/exception/custom.exception';
 import { kstAt } from '../../../domain/value/work-date';
 import { FixedClock } from '../../../../test/fakes/fixed-clock';
 import { InMemoryAttendanceRepository } from '../../../../test/fakes/in-memory-attendance.repository';
+import { InMemoryLedgerRepository } from '../../../../test/fakes/in-memory-ledger.repository';
 import { InMemoryRequestDayRepository } from '../../../../test/fakes/in-memory-request-day.repository';
 import { KIM, LEAD } from '../../../../test/fakes/users';
 import { CheckInUseCase } from './check-in.use-case';
@@ -13,6 +14,7 @@ describe('ManualCheckOutUseCase', () => {
   let attendances: InMemoryAttendanceRepository;
   let checkIn: CheckInUseCase;
   let manual: ManualCheckOutUseCase;
+  let ledger: InMemoryLedgerRepository;
 
   // 목요일 09:00 출근 후 퇴근 안 찍음 → 금요일 09:00 출근
   beforeEach(async () => {
@@ -23,7 +25,8 @@ describe('ManualCheckOutUseCase', () => {
       attendances,
       new InMemoryRequestDayRepository(),
     );
-    manual = new ManualCheckOutUseCase(clock, attendances);
+    ledger = new InMemoryLedgerRepository();
+    manual = new ManualCheckOutUseCase(clock, attendances, ledger);
     await checkIn.execute({ user: KIM, ip: '127.0.0.1' });
     clock.at('2026-11-13', '09:00:00');
     await checkIn.execute({ user: KIM, ip: '127.0.0.1' });
@@ -82,7 +85,7 @@ describe('ManualCheckOutUseCase', () => {
   it('입력하고 나면 퇴근 버튼이 다시 동작한다', async () => {
     await manual.execute(input('18:00:00'));
     clock.at('2026-11-13', '18:00:00');
-    const out = await new CheckOutUseCase(clock, attendances).execute({
+    const out = await new CheckOutUseCase(clock, attendances, ledger).execute({
       user: KIM,
       ip: '127.0.0.1',
     });

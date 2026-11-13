@@ -1,0 +1,186 @@
+import { LedgerEntry } from '../entity/ledger-entry.entity';
+import {
+  annualAccrualDates,
+  balanceOf,
+  dueEvents,
+  offExpiresOn,
+  offGrants,
+  pickOffGrant,
+} from './balance.policy';
+
+let seq = 1;
+const entry = (p: Partial<LedgerEntry['props']>): LedgerEntry =>
+  new LedgerEntry({
+    id: seq++,
+    userId: 2,
+    kind: 'ANNUAL',
+    event: 'ACCRUE',
+    halfDays: 2,
+    effectiveDate: '2026-02-01',
+    expiresOn: null,
+    grantId: null,
+    requestDayId: null,
+    dedupKey: null,
+    ...p,
+  });
+const offGrant = (id: number, date: string) =>
+  entry({
+    id,
+    kind: 'HALF_OFF',
+    event: 'ACCRUE',
+    halfDays: 1,
+    effectiveDate: date,
+    expiresOn: offExpiresOn(date),
+  });
+
+describe('연차 적립일 annualAccrualDates', () => {
+  it('입사 당일엔 적립되지 않고 1개월 뒤부터 매월 입사일과 같은 날 (김근태 1/1 입사)', () => {
+    expect(annualAccrualDates('2026-01-01', '2026-04-15')).toEqual([
+      '2026-02-01',
+      '2026-03-01',
+      '2026-04-01',
+    ]);
+  });
+
+  it('적립일 당일은 포함한다 (연차원 1/15 입사, 오늘 2/15)', () => {
+    expect(annualAccrualDates('2026-01-15', '2026-02-15')).toEqual([
+      '2026-02-15',
+    ]);
+  });
+
+  it('적립일 전날까지는 없다 (2/14)', () => {
+    expect(annualAccrualDates('2026-01-15', '2026-02-14')).toEqual([]);
+  });
+
+  it('그 날짜가 없는 달은 말일에 적립한다 (1/31 입사 → 2/28, 3/31, 4/30)', () => {
+    expect(annualAccrualDates('2026-01-31', '2026-04-30')).toEqual([
+      '2026-02-28',
+      '2026-03-31',
+      '2026-04-30',
+    ]);
+  });
+});
+
+describe('반일 OFF 만료 offExpiresOn', () => {
+  it('지급일 + 30일이 마지막 사용 가능일이다', () => {
+    expect(offExpiresOn('2026-11-01')).toBe('2026-12-01');
+  });
+});
+
+describe('잔여 balanceOf (반일 단위)', () => {
+  it('연차는 적립·사용·복원을 합산한다', () => {
+    const entries = [
+      entry({ effectiveDate: '2026-02-01' }),
+      entry({ effectiveDate: '2026-03-01' }),
+      entry({ event: 'USE', halfDays: -2, effectiveDate: '2026-03-10' }),
+      entry({ event: 'RESTORE', halfDays: 2, effectiveDate: '2026-03-10' }),
+      entry({ event: 'USE', halfDays: -2, effectiveDate: '2026-03-11' }),
+    ];
+    expect(balanceOf(entries, '2026-03-05').annual).toBe(2);
+  });
+
+  it('사용은 신청 시 차감하므로 미래 날짜의 사용도 바로 뺀다', () => {
+    const entries = [
+      entry({ effectiveDate: '2026-02-01' }),
+      entry({ event: 'USE', halfDays: -2, effectiveDate: '2026-12-24' }),
+    ];
+    expect(balanceOf(entries, '2026-03-01').annual).toBe(0);
+  });
+
+  it('시계를 되돌리면 그 뒤의 적립은 아직 없는 것으로 본다', () => {
+    const entries = [
+      entry({ effectiveDate: '2026-02-01' }),
+      entry({ effectiveDate: '2026-03-01' }),
+    ];
+    expect(balanceOf(entries, '2026-02-15').annual).toBe(2);
+  });
+
+  it('반일 OFF는 따로 합산한다', () => {
+    const entries = [entry({}), offGrant(100, '2026-11-01')];
+    expect(balanceOf(entries, '2026-11-02')).toEqual({ annual: 2, halfOff: 1 });
+  });
+});
+
+describe('OFF 지급분별 남은 수 offGrants', () => {
+  it('사용·복원을 지급분에 연결해 센다', () => {
+    const entries = [
+      offGrant(100, '2026-11-01'),
+      entry({ kind: 'HALF_OFF', event: 'USE', halfDays: -1, grantId: 100 }),
+      entry({ kind: 'HALF_OFF', event: 'RESTORE', halfDays: 1, grantId: 100 }),
+    ];
+    expect(offGrants(entries, '2026-11-02')).toEqual([
+      { grantId: 100, expiresOn: '2026-12-01', remaining: 1 },
+    ]);
+  });
+});
+
+describe('사용할 OFF 고르기 pickOffGrant (만료 임박 순, 결정 6)', () => {
+  it('만료가 가까운 것부터 쓴다', () => {
+    const entries = [offGrant(200, '2026-11-10'), offGrant(100, '2026-11-01')];
+    expect(pickOffGrant(entries, '2026-11-20', '2026-11-12')).toBe(100);
+  });
+
+  it('나중에 기록된 지급분이라도 만료가 더 가까우면 먼저 쓴다 (주말 근무 퇴근을 다음 출근 때 직접 입력한 경우)', () => {
+    const entries = [offGrant(100, '2026-11-10'), offGrant(200, '2026-11-01')];
+    expect(pickOffGrant(entries, '2026-11-20', '2026-11-12')).toBe(200);
+  });
+
+  it('다 쓴 지급분은 건너뛴다', () => {
+    const entries = [
+      offGrant(100, '2026-11-01'),
+      offGrant(200, '2026-11-10'),
+      entry({ kind: 'HALF_OFF', event: 'USE', halfDays: -1, grantId: 100 }),
+    ];
+    expect(pickOffGrant(entries, '2026-11-20', '2026-11-12')).toBe(200);
+  });
+
+  it('사용일에 이미 만료되는 지급분은 쓸 수 없다', () => {
+    const entries = [offGrant(100, '2026-11-01')]; // 12/1까지
+    expect(pickOffGrant(entries, '2026-12-02', '2026-11-05')).toBeNull();
+    expect(pickOffGrant(entries, '2026-12-01', '2026-11-05')).toBe(100);
+  });
+});
+
+describe('채워 넣을 이벤트 dueEvents (조회 시 동기화)', () => {
+  it('빠진 연차 적립을 dedupKey와 함께 만든다', () => {
+    const existing = [
+      entry({
+        effectiveDate: '2026-02-01',
+        dedupKey: 'ACCRUE:ANNUAL:2:2026-02-01',
+      }),
+    ];
+    const due = dueEvents(2, '2026-01-01', existing, '2026-03-01');
+    expect(due.map((d) => d.dedupKey)).toEqual(['ACCRUE:ANNUAL:2:2026-03-01']);
+    expect(due[0]).toMatchObject({
+      kind: 'ANNUAL',
+      event: 'ACCRUE',
+      halfDays: 2,
+    });
+  });
+
+  it('만료일이 지난 OFF의 남은 수만큼 만료 이벤트를 만든다 (만료 다음 날)', () => {
+    const existing = [offGrant(100, '2026-11-01')]; // 12/1까지
+    expect(dueEvents(2, '2026-11-15', existing, '2026-12-01')).toEqual([]);
+    expect(dueEvents(2, '2026-11-15', existing, '2026-12-02')).toEqual([
+      {
+        userId: 2,
+        kind: 'HALF_OFF',
+        event: 'EXPIRE',
+        halfDays: -1,
+        effectiveDate: '2026-12-02',
+        expiresOn: null,
+        grantId: 100,
+        requestDayId: null,
+        dedupKey: 'EXPIRE:HALF_OFF:100:1',
+      },
+    ]);
+  });
+
+  it('이미 쓴 OFF는 만료되지 않는다', () => {
+    const existing = [
+      offGrant(100, '2026-11-01'),
+      entry({ kind: 'HALF_OFF', event: 'USE', halfDays: -1, grantId: 100 }),
+    ];
+    expect(dueEvents(2, '2026-11-15', existing, '2026-12-10')).toEqual([]);
+  });
+});

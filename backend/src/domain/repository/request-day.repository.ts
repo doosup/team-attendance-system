@@ -17,4 +17,9 @@ export abstract class RequestDayRepository {
     userId: number,
     date: string,
   ): Promise<DayRequest[]>;
+  // 그 달 살아 있는(대기·승인, ACTIVE) 재택 날짜 수. 예외 신청분은 따로 (결정 11·18)
+  abstract countRemoteDays(
+    userId: number,
+    month: string,
+  ): Promise<{ normal: number; overLimit: number }>;
 }

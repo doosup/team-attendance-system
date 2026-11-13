@@ -1,9 +1,12 @@
+import { Transactional } from '@nestjs-cls/transactional';
 import { Injectable } from '@nestjs/common';
 import { User } from '../../../domain/entity/user.entity';
 import { CustomException } from '../../../domain/exception/custom.exception';
 import { assertManualCheckOutRange } from '../../../domain/policy/attendance.policy';
+import { weekendWorkOffGrant } from '../../../domain/policy/balance.policy';
 import { Clock } from '../../../domain/port/clock.port';
 import { AttendanceRepository } from '../../../domain/repository/attendance.repository';
+import { LedgerRepository } from '../../../domain/repository/ledger.repository';
 import { workDateOf } from '../../../domain/value/work-date';
 import { UseCase } from '../../use-case.interface';
 import { AttendanceResult } from '../dto/check-in.dto';
@@ -16,14 +19,16 @@ interface Input {
 }
 
 // 직전 근무일의 미기록 퇴근 1건만 입력받는다 (결정 9). 16:00 제한은 없고 조퇴 판정은 한다.
-// shortcut: MANUAL_CHECK_OUT 이력은 ATT-6, 주말 근무 OFF 지급은 ATT-16에서 연결.
+// shortcut: MANUAL_CHECK_OUT 이력은 ATT-6에서 연결.
 @Injectable()
 export class ManualCheckOutUseCase implements UseCase<Input, AttendanceResult> {
   constructor(
     private readonly clock: Clock,
     private readonly attendances: AttendanceRepository,
+    private readonly ledger: LedgerRepository,
   ) {}
 
+  @Transactional()
   async execute({ user, attendanceId, checkOutAt, ip }: Input) {
     const today = workDateOf(this.clock.now());
     const pending = await this.attendances.findLatestBefore(user.id, today);
@@ -38,6 +43,16 @@ export class ManualCheckOutUseCase implements UseCase<Input, AttendanceResult> {
     );
     pending.checkOut(checkOutAt, 'MANUAL', ip);
     await this.attendances.save(pending);
+    if (pending.props.dayType === 'WEEKEND_WORK') {
+      await this.ledger.append([
+        weekendWorkOffGrant({
+          userId: user.id,
+          attendanceId: pending.id,
+          workDate: pending.props.workDate,
+          requestDayId: pending.props.requestDayId,
+        }),
+      ]);
+    }
     return AttendanceResult.from(pending);
   }
 }
