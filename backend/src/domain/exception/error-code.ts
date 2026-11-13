@@ -14,6 +14,9 @@ export const ERROR_MESSAGES = {
   ALREADY_CHECKED_OUT: '오늘은 이미 퇴근했습니다',
   CHECK_OUT_TOO_EARLY: '퇴근은 16:00부터 등록할 수 있습니다',
   PENDING_MANUAL_CHECKOUT: '먼저 퇴근을 찍지 않은 날의 퇴근 시각을 입력하세요',
+  MANUAL_CHECKOUT_OUT_OF_RANGE:
+    '퇴근 시각은 그날 출근 시각 이후부터 23:59:59까지 입력할 수 있습니다',
+  MANUAL_CHECKOUT_NOT_PENDING: '직접 입력할 미기록 퇴근 건이 아닙니다',
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

@@ -1,7 +1,7 @@
 import { DayType } from '../entity/attendance.entity';
 import { CustomException } from '../exception/custom.exception';
 import { DayRequest, RequestType } from '../repository/request-day.repository';
-import { msOfDayKst } from '../value/work-date';
+import { msOfDayKst, workDateOf } from '../value/work-date';
 
 const HOUR = 3600 * 1000;
 const CHECK_IN_OPEN = 7 * HOUR; // 07:00:00부터
@@ -98,4 +98,15 @@ export function judgeWork(
     workedMinutes: Math.floor(ms / 60000),
     isEarlyLeave: required !== null && ms < required,
   };
+}
+
+/** 미기록 퇴근 직접 입력 범위: 그날 출근 시각 이후 ~ 그날 23:59:59 (결정 9) */
+export function assertManualCheckOutRange(
+  checkInAt: Date,
+  checkOutAt: Date,
+  workDate: string,
+): void {
+  if (checkOutAt <= checkInAt || workDateOf(checkOutAt) !== workDate) {
+    throw new CustomException('MANUAL_CHECKOUT_OUT_OF_RANGE');
+  }
 }

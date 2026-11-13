@@ -349,6 +349,7 @@ backend/src/
 **개발용 시각 변경 (`/dev/clock`)**
 - `NODE_ENV`가 `production`이 아닐 때만 모듈을 등록한다 (아니면 404). 평가자의 `start:dev`에서는 켜져 있다
 - `PUT { "now": "2026-11-13T09:59:50+09:00" }`: 오프셋(`Z` 또는 `±hh:mm`)이 있는 ISO 8601만 허용, 아니면 400 `VALIDATION_FAILED`
+- 업무 시각은 **초 단위로 자른다** (Clock 한 곳에서): ms 차이로 지각·조퇴가 갈리지 않게 (결정 원칙 3)
 - 바꾼 뒤에도 시간은 흐른다: 실제 시각과의 차이만 서버 메모리에 저장 (09:59:50으로 바꾸고 10초 뒤 = 10:00:00). 재시작·`DELETE` 시 실제 시각
 - 응답 (GET·PUT·DELETE 공통): `{ data: { now: "<ISO 8601 UTC>", overridden: boolean } }`
 
@@ -369,6 +370,7 @@ backend/src/
 | CHECK_OUT_TOO_EARLY | 422 | 일반일 16:00:00 이전 퇴근 (반일 OFF·긴급 출근·주말 근무 날 제외) |
 | PENDING_MANUAL_CHECKOUT | 409 | 미기록 퇴근 입력 전 퇴근 시도 |
 | MANUAL_CHECKOUT_OUT_OF_RANGE | 422 | 직접 입력 시각이 출근~23:59:59 밖 |
+| MANUAL_CHECKOUT_NOT_PENDING | 409 | 직접 입력 대상(직전 근무일의 미기록 1건)이 아님. 남의 기록·오늘 기록·이미 입력한 기록 모두 같은 응답 |
 | INVALID_DATE_RANGE | 422 | 종료일이 시작일보다 이르거나, 하루만 가능한 종류에 기간을 넣음 |
 | NO_BUSINESS_DAY_IN_RANGE | 422 | 연차·재택 기간에 영업일이 하나도 없음 |
 | REQUEST_DEADLINE_PASSED | 422 | 시작일의 직전 영업일 17:00:00 이후 신청·본인 취소 |
