@@ -24,6 +24,21 @@ export class InMemoryRequestRepository extends RequestRepository {
     return Promise.resolve(r ? copy(r) : null);
   }
 
+  findByStatus(status: string) {
+    return Promise.resolve(
+      this.rows
+        .filter((r) => r.props.status === status)
+        .sort((a, b) => a.props.startDate.localeCompare(b.props.startDate))
+        .map(copy),
+    );
+  }
+
+  save(request: Request) {
+    const i = this.rows.findIndex((r) => r.props.id === request.props.id);
+    this.rows[i] = copy(request);
+    return Promise.resolve();
+  }
+
   findByUser(userId: number, includeCanceled: boolean) {
     return Promise.resolve(
       this.rows

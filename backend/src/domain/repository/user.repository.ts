@@ -4,4 +4,5 @@ import { User } from '../entity/user.entity';
 export abstract class UserRepository {
   abstract findById(id: number): Promise<User | null>;
   abstract findByLoginId(loginId: string): Promise<User | null>;
+  abstract findAll(): Promise<User[]>;
 }

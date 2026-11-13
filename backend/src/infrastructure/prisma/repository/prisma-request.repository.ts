@@ -1,6 +1,7 @@
 import { TransactionHost } from '@nestjs-cls/transactional';
 import { Injectable } from '@nestjs/common';
 import { Request } from '../../../domain/entity/request.entity';
+import { RequestStatus } from '../../../domain/repository/request-day.repository';
 import { RequestRepository } from '../../../domain/repository/request.repository';
 import { RequestMapper } from '../mapper/request.mapper';
 import type { PrismaTx } from '../transaction';
@@ -38,6 +39,41 @@ export class PrismaRequestRepository extends RequestRepository {
       include: { days: true },
     });
     return m && RequestMapper.toEntity(m);
+  }
+
+  async findByStatus(status: RequestStatus): Promise<Request[]> {
+    const rows = await this.tx.request.findMany({
+      where: { status },
+      include: { days: true },
+      orderBy: [{ startDate: 'asc' }, { id: 'asc' }],
+    });
+    return rows.map((m) => RequestMapper.toEntity(m));
+  }
+
+  async save(request: Request): Promise<void> {
+    const p = request.props;
+    await this.tx.request.update({
+      where: { id: request.id },
+      data: {
+        status: p.status,
+        decidedById: p.decidedById,
+        decidedAt: p.decidedAt,
+        rejectReason: p.rejectReason,
+      },
+    });
+    for (const d of p.days) {
+      if (d.id === null) continue;
+      await this.tx.requestDay.update({
+        where: { id: d.id },
+        data: {
+          status: d.status,
+          cancelType: d.cancelType,
+          canceledById: d.canceledById,
+          canceledAt: d.canceledAt,
+          cancelReason: d.cancelReason,
+        },
+      });
+    }
   }
 
   async findByUser(

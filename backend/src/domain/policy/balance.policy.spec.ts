@@ -6,6 +6,7 @@ import {
   offExpiresOn,
   offGrants,
   pickOffGrant,
+  restoreDrafts,
 } from './balance.policy';
 
 let seq = 1;
@@ -182,5 +183,62 @@ describe('채워 넣을 이벤트 dueEvents (조회 시 동기화)', () => {
       entry({ kind: 'HALF_OFF', event: 'USE', halfDays: -1, grantId: 100 }),
     ];
     expect(dueEvents(2, '2026-11-15', existing, '2026-12-10')).toEqual([]);
+  });
+});
+
+describe('복원 restoreDrafts (반려·취소된 날짜만, 원래 지급분·만료 유지)', () => {
+  it('사용한 날짜 행마다 같은 양을 되돌리고 OFF는 같은 지급분에 연결한다', () => {
+    const entries = [
+      entry({
+        id: 1,
+        event: 'USE',
+        halfDays: -2,
+        requestDayId: 11,
+        effectiveDate: '2026-11-13',
+      }),
+      entry({
+        id: 2,
+        event: 'USE',
+        halfDays: -2,
+        requestDayId: 12,
+        effectiveDate: '2026-11-16',
+      }),
+      entry({
+        id: 3,
+        kind: 'HALF_OFF',
+        event: 'USE',
+        halfDays: -1,
+        grantId: 100,
+        requestDayId: 13,
+      }),
+    ];
+    expect(restoreDrafts(entries, [11, 13])).toEqual([
+      expect.objectContaining({
+        kind: 'ANNUAL',
+        event: 'RESTORE',
+        halfDays: 2,
+        requestDayId: 11,
+        grantId: null,
+      }),
+      expect.objectContaining({
+        kind: 'HALF_OFF',
+        event: 'RESTORE',
+        halfDays: 1,
+        requestDayId: 13,
+        grantId: 100,
+      }),
+    ]);
+  });
+
+  it('이미 복원한 날짜는 다시 복원하지 않는다', () => {
+    const entries = [
+      entry({ event: 'USE', halfDays: -2, requestDayId: 11 }),
+      entry({ event: 'RESTORE', halfDays: 2, requestDayId: 11 }),
+    ];
+    expect(restoreDrafts(entries, [11])).toEqual([]);
+  });
+
+  it('차감이 없는 신청(재택·주말 근무)은 복원할 것이 없다', () => {
+    expect(restoreDrafts([], [21, 22])).toEqual([]);
   });
 });
