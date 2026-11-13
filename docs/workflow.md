@@ -61,19 +61,23 @@
 6. 설계와 다르게 구현해야 할 일이 생기면 코드를 바꾸기 전에 사용자에게 먼저 묻는다. 결정되면 `docs/decisions.md` 또는 `docs/design.md`도 함께 고친다.
 
 ## 스킬 사용 시점
-설치 이름이 다를 수 있으니 `/skills`에서 정확한 이름을 확인하고 쓴다.
-
 | 스킬 | 언제 | 왜 |
 |---|---|---|
-| ponytail | 항상 (자동) | 필요한 만큼만 짓도록. 과한 추상화·불필요한 파일을 만들지 않는다 |
-| agent-skills: 테스트 주도 개발 계열 | D2 정책·도메인 티켓 (ATT-24, 10, 23, 16, 12, 14) | 판정 규칙은 경계값이 많아 테스트 먼저가 안전하다 |
-| agent-skills: security-and-hardening | ATT-20 로그인, ATT-14 IP Guard, ATT-28 IP 관리 | 인증·IP 입력 검증·권한 분리 점검 |
-| agent-skills: 코드 리뷰 계열 / security-review | 각 PR 올리기 직전 | 레이어 규칙 위반(domain이 Nest·Prisma import), `new Date()` 직접 사용 확인 |
-| Impeccable | D3 프론트 시작 전(방향 잡기), D4 QA 때(화면 점검) | 화면이 템플릿처럼 보이지 않게 |
-| Graphify | D3 백엔드가 끝난 뒤 한 번 | 코드 구조 그래프 → README 아키텍처 설명·면접 자료 |
-| agent-skills: ship | D4 제출 직전 | 실행 방법·README·체크리스트 최종 점검 |
+| `/ponytail:ponytail` | 항상 (자동) | 필요한 만큼만 짓도록. 과한 추상화·불필요한 파일을 만들지 않는다 |
+| `/agent-skills:test-driven-development` | D2 정책·도메인 티켓 (ATT-24, 10, 23, 16, 12, 14) | 판정 규칙은 경계값이 많아 테스트 먼저가 안전하다 |
+| `/agent-skills:incremental-implementation` | 여러 파일을 건드리는 D2 티켓 (ATT-12, 16, 14) | 테스트가 통과하는 작은 단위로 나눠 짓는다 (커밋 하나 = 통과 단위) |
+| `/agent-skills:debugging-and-error-recovery` | 테스트·빌드가 깨질 때 | 원인을 찾고 나서 고친다 |
+| `/agent-skills:security-and-hardening` | ATT-20 로그인, ATT-14 IP Guard, ATT-28 IP 관리 | 인증·IP 입력 검증·권한 분리 점검 |
+| `/agent-skills:code-review-and-quality`, `/security-review` | 각 PR 올리기 직전 | 레이어 규칙 위반(domain이 Nest·Prisma import), `new Date()` 직접 사용 확인. ATT-7 PR 전에 `/code-review`와 비교해 바꿀 수 있음 |
+| `/agent-skills:git-workflow-and-versioning` | 각 티켓 끝 | 커밋 메시지·PR 제목/본문 제안을 규칙 형식에 맞춘다 |
+| `/impeccable:impeccable` | D3 프론트 시작 전(방향 잡기), D4 QA 때(화면 점검) | 화면이 템플릿처럼 보이지 않게 |
+| `/agent-skills:frontend-ui-engineering` | D3 프론트 (ATT-4, 22, 3, 15, 26) | 컴포넌트·상태·접근성 구현 (Impeccable은 방향, 이건 구현) |
+| `/graphify` | D3 백엔드가 끝난 뒤 한 번 | 코드 구조 그래프 → README 아키텍처 설명·면접 자료 |
+| `/run` | ATT-8 시나리오 QA·새 환경 실행 점검 | 앱을 실제로 띄워 동작을 확인한다 |
+| `/ponytail:ponytail-debt` | ATT-17 직전 | 코드의 `shortcut:` 주석을 모아 README "확장 방안" 소재로 쓴다 |
+| `/agent-skills:documentation-and-adrs` | ATT-17 README·ADR | 설계 의도·고민 기록이 평가 기준이다 |
 
-쓰지 않는 것: spec-driven-development, planning-and-task-breakdown, interview-me — 스펙·설계·티켓 분해는 이미 끝났다.
+쓰지 않는 것: `/agent-skills:spec-driven-development`, `/agent-skills:planning-and-task-breakdown`, `/agent-skills:interview-me` — 스펙·설계·티켓 분해는 이미 끝났다. `/agent-skills:shipping-and-launch` — 운영 배포용이라 ATT-8의 `/run` 점검으로 대신한다.
 
 ## 변하지 않는 원칙
 - Claude는 git commit·push를 하지 않는다.
