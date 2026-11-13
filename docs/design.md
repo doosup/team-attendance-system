@@ -163,6 +163,9 @@ erDiagram
 - `targetType + targetId`: 여러 테이블을 가리키므로 FK 없음 (이력·대상 모두 지우지 않아 문제없음). 가리킬 행이 없는 행동(LOGIN_FAIL·IP_BLOCKED·CLOCK_CHANGE)은 둘 다 null
 - `payload` Json: 행동마다 남길 내용이 다름 (SQLite Json은 Prisma 6.2+)
 - 시각 두 개: `occurredAt`(Clock 기준 업무 시각), `createdAt`(실제 기록 시각) → 시각을 바꿔 테스트한 기록인지 구분
+- 기록하는 행동: CHECK_IN·CHECK_OUT·MANUAL_CHECK_OUT(근무시간·조퇴·OFF 지급), REQUEST_CREATE(자동 승인·예외 표시), LOGIN, LOGIN_FAIL(아이디만, 비밀번호 없음), IP_BLOCKED(메서드·경로), CLOCK_CHANGE(from·to), 승인·반려·취소·IP 관리. **조회는 기록하지 않는다**
+- 변경 이력은 그 변경과 **같은 트랜잭션**에 쓴다(변경이 롤백되면 이력도 없음). 거부 자체가 사건인 LOGIN_FAIL·IP_BLOCKED는 트랜잭션 밖에서 먼저 쓰고 거부한다
+- 조회 `GET /lead/audit-logs?userId=&from=&to=`: from·to는 KST 날짜(끝 날짜 포함), occurredAt 최신순 200건
 
 ### AllowedIp
 - 연구실 IP 상시 허용 목록. 시드 `127.0.0.1`. 리드가 API로 관리

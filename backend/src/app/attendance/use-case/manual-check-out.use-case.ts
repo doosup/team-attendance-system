@@ -5,6 +5,7 @@ import { CustomException } from '../../../domain/exception/custom.exception';
 import { assertManualCheckOutRange } from '../../../domain/policy/attendance.policy';
 import { weekendWorkOffGrant } from '../../../domain/policy/balance.policy';
 import { Clock } from '../../../domain/port/clock.port';
+import { AuditLogRepository } from '../../../domain/repository/audit-log.repository';
 import { AttendanceRepository } from '../../../domain/repository/attendance.repository';
 import { LedgerRepository } from '../../../domain/repository/ledger.repository';
 import { workDateOf } from '../../../domain/value/work-date';
@@ -19,13 +20,13 @@ interface Input {
 }
 
 // 직전 근무일의 미기록 퇴근 1건만 입력받는다 (결정 9). 16:00 제한은 없고 조퇴 판정은 한다.
-// shortcut: MANUAL_CHECK_OUT 이력은 ATT-6에서 연결.
 @Injectable()
 export class ManualCheckOutUseCase implements UseCase<Input, AttendanceResult> {
   constructor(
     private readonly clock: Clock,
     private readonly attendances: AttendanceRepository,
     private readonly ledger: LedgerRepository,
+    private readonly audit: AuditLogRepository,
   ) {}
 
   @Transactional()
@@ -43,7 +44,8 @@ export class ManualCheckOutUseCase implements UseCase<Input, AttendanceResult> {
     );
     pending.checkOut(checkOutAt, 'MANUAL', ip);
     await this.attendances.save(pending);
-    if (pending.props.dayType === 'WEEKEND_WORK') {
+    const offGranted = pending.props.dayType === 'WEEKEND_WORK';
+    if (offGranted) {
       await this.ledger.append([
         weekendWorkOffGrant({
           userId: user.id,
@@ -53,6 +55,22 @@ export class ManualCheckOutUseCase implements UseCase<Input, AttendanceResult> {
         }),
       ]);
     }
+    const p = pending.props;
+    await this.audit.append({
+      actorId: user.id,
+      action: 'MANUAL_CHECK_OUT',
+      targetType: 'Attendance',
+      targetId: pending.id,
+      payload: {
+        workDate: p.workDate,
+        checkOutAt: p.checkOutAt?.toISOString(),
+        workedMinutes: p.workedMinutes,
+        isEarlyLeave: p.isEarlyLeave,
+        offGranted,
+      },
+      ip,
+      occurredAt: this.clock.now(),
+    });
     return AttendanceResult.from(pending);
   }
 }

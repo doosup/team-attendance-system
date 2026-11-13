@@ -1,3 +1,4 @@
+import { InMemoryAuditLogRepository } from '../../../test/fakes/in-memory-audit-log.repository';
 import { ExecutionContext } from '@nestjs/common';
 import { User } from '../../domain/entity/user.entity';
 import { CustomException } from '../../domain/exception/custom.exception';
@@ -11,21 +12,26 @@ import { IpGuard } from './ip.guard';
 
 const contextWith = (ip: string, user?: User) =>
   ({
-    switchToHttp: () => ({ getRequest: () => ({ ip, user }) }),
+    switchToHttp: () => ({
+      getRequest: () => ({ ip, user, method: 'GET', url: '/attendance/today' }),
+    }),
   }) as unknown as ExecutionContext;
 
 describe('IpGuard', () => {
   let clock: FixedClock;
   let requests: InMemoryRequestRepository;
   let guard: IpGuard;
+  let audit: InMemoryAuditLogRepository;
 
   beforeEach(async () => {
     clock = new FixedClock('2026-11-16', '10:00:00'); // 월
     requests = new InMemoryRequestRepository();
+    audit = new InMemoryAuditLogRepository();
     guard = new IpGuard(
       clock,
       new InMemoryAllowedIpRepository(['127.0.0.1']),
       new InMemoryRequestDayRepository(requests),
+      audit,
     );
     // 김근태 11/16 재택 승인 (10.0.0.7, 09:00~18:00)
     const remote = Request.submit(
@@ -110,5 +116,21 @@ describe('IpGuard', () => {
   it('로그인 전(사용자 모름)에는 그 IP·시간대의 승인 신청이 있으면 통과시킨다', async () => {
     expect(await check('10.0.0.7')).toBe(true);
     expect(await check('203.0.113.9')).toBe('IP_NOT_ALLOWED');
+  });
+
+  it('막은 요청은 IP_BLOCKED 이력에 IP·경로를 남긴다', async () => {
+    await check('203.0.113.9', KIM);
+    expect(audit.rows[0]).toMatchObject({
+      actorId: KIM.id,
+      action: 'IP_BLOCKED',
+      targetType: null,
+      ip: '203.0.113.9',
+      payload: { method: 'GET', path: '/attendance/today' },
+    });
+  });
+
+  it('허용한 요청은 이력을 남기지 않는다', async () => {
+    await check('127.0.0.1', KIM);
+    expect(audit.rows).toEqual([]);
   });
 });

@@ -1,3 +1,4 @@
+import { InMemoryAuditLogRepository } from '../../../../test/fakes/in-memory-audit-log.repository';
 import { kstAt } from '../../../domain/value/work-date';
 import { FixedClock } from '../../../../test/fakes/fixed-clock';
 import { InMemoryAttendanceRepository } from '../../../../test/fakes/in-memory-attendance.repository';
@@ -18,7 +19,12 @@ describe('GetTodayUseCase', () => {
     attendances = new InMemoryAttendanceRepository();
     requestDays = new InMemoryRequestDayRepository();
     getToday = new GetTodayUseCase(clock, attendances, requestDays);
-    checkIn = new CheckInUseCase(clock, attendances, requestDays);
+    checkIn = new CheckInUseCase(
+      clock,
+      attendances,
+      requestDays,
+      new InMemoryAuditLogRepository(),
+    );
   });
 
   it('출근 전에는 근무 유형만 있고 기록·정상 퇴근 시각은 없다', async () => {
