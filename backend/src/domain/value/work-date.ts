@@ -26,3 +26,7 @@ export const addDays = (date: string, n: number): string =>
 
 /** 0 = 일요일 … 6 = 토요일 */
 export const dayOfWeek = (date: string): number => dayjs.utc(date).day();
+
+/** 'YYYY-MM' → 그 달 말일 'YYYY-MM-DD' */
+export const lastDayOfMonth = (month: string): string =>
+  dayjs.utc(`${month}-01`).endOf('month').format('YYYY-MM-DD');

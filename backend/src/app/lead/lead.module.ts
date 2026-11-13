@@ -20,6 +20,8 @@ import { GetAuditLogsController } from './audit-log/controller/get-audit-logs.co
 import { GetAuditLogsUseCase } from './audit-log/use-case/get-audit-logs.use-case';
 import { GetUserLedgerController } from './balance/controller/get-user-ledger.controller';
 import { GetUserLedgerUseCase } from './balance/use-case/get-user-ledger.use-case';
+import { GetMonthlySettlementController } from './settlement/controller/get-monthly-settlement.controller';
+import { GetMonthlySettlementUseCase } from './settlement/use-case/get-monthly-settlement.use-case';
 
 // 리드 전용 기능 (/lead/..., 컨트롤러마다 @Roles('LEAD'))
 @Module({
@@ -35,6 +37,7 @@ import { GetUserLedgerUseCase } from './balance/use-case/get-user-ledger.use-cas
     AddAllowedIpController,
     DeleteAllowedIpController,
     GetTeamMissingController,
+    GetMonthlySettlementController,
   ],
   providers: [
     GetUserLedgerUseCase,
@@ -47,6 +50,7 @@ import { GetUserLedgerUseCase } from './balance/use-case/get-user-ledger.use-cas
     AddAllowedIpUseCase,
     DeleteAllowedIpUseCase,
     GetTeamMissingUseCase,
+    GetMonthlySettlementUseCase,
   ],
 })
 export class LeadModule {}
