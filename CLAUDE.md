@@ -3,6 +3,8 @@
 팀 내부 근태관리 웹앱. 리드 1명 + 팀원 3명. 평가자가 **로컬에서 clone → 설치 → 실행**만으로 동작해야 한다.
 평가 기준: 구현한 부분의 품질, 설계 의도와 고민(README에 기록). UI는 단순하게.
 
+> **작업을 시작하기 전에 `docs/workflow.md`를 먼저 읽는다.** 진행 현황, 티켓 순서, 티켓 하나의 작업 순서, 스킬 사용 시점이 정리되어 있다.
+
 ## 기술 스택
 - backend/: NestJS (TypeScript), Prisma(6.2+), SQLite (`backend/prisma/dev.db`, gitignore)
 - frontend/: Vue 3 (TypeScript, Vite, Pinia, Vue Router)
