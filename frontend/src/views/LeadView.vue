@@ -8,9 +8,10 @@ import type {
   MissingCheckout,
 } from '@/api/types';
 import { kstDateTime, kstTime, REQUEST_TYPE } from '@/format';
+import SettlementPanel from '@/components/SettlementPanel.vue';
 import { useClockStore } from '@/stores/clock';
 
-// 리드 전용: 승인·반려, 당일 취소, 팀 미기록, 연구실 IP, 이력
+// 리드 전용: 승인·반려, 당일 취소, 팀 미기록, 월별 정산, 연구실 IP, 이력
 const clock = useClockStore();
 const pending = ref<LeaveRequest[]>([]);
 const approved = ref<LeaveRequest[]>([]);
@@ -176,6 +177,8 @@ const period = (r: LeaveRequest) =>
       </tbody>
     </table>
   </section>
+
+  <SettlementPanel />
 
   <section class="card">
     <h2>연구실 IP</h2>

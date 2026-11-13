@@ -260,7 +260,6 @@ backend/src/
 │   │   ├── repository/   prisma-attendance.repository.ts …  ← 구현
 │   │   ├── mapper/       attendance.mapper.ts …  (Prisma 모델 ↔ 엔티티)
 │   │   └── repository.module.ts  (인터페이스 ↔ 구현 연결)
-│   ├── query/            settlement.query.ts  (조회 전용, 선택 기능)
 │   ├── clock/            system.clock.ts, overridable.clock.ts  (clock.port 구현)
 │   └── token/            jwt-token.service.ts
 ├── common/
@@ -283,7 +282,6 @@ backend/src/
 | domain | repository/ | 저장소 약속(abstract class) | 구현 |
 | domain | port/ | 외부 의존의 약속 (Clock) | 구현 |
 | infrastructure | prisma/repository, mapper | 약속의 Prisma 구현, 모델 ↔ 엔티티 변환 | 업무 판단 |
-| infrastructure | query/ | 여러 테이블을 읽기만 하는 조회 (팀 보드, 정산) | 쓰기 |
 | common | guards, filters, interceptors … | 인증·권한·IP, 응답·에러 형식 | 업무 판단 |
 
 **의존 방향:** app → domain ← infrastructure. domain은 아무것도 import하지 않는다.
@@ -343,7 +341,7 @@ backend/src/
 | 리드 | POST | /lead/allowed-ips | 추가 `{ ip, label }` (형식 검사·정규화) | 리드 | FR-SYS-01 |
 | 리드 | DELETE | /lead/allowed-ips/:id | 소프트 삭제 (현재 접속 IP·마지막 IP 불가) | 리드 | FR-SYS-01 |
 | 리드 | GET | /lead/audit-logs?userId=&from=&to= | 인터랙션 이력 | 리드 | FR-LOG-01 |
-| 리드 | GET | /lead/settlements?month= | 월별 정산 (선택) | 리드 | FR-STL-01 |
+| 리드 | GET | /lead/settlements?month= | 월별 정산 (선택). month 없으면 이번 달. 팀원별 근무일·근무시간·지각·조퇴·직접 입력·미기록·연차/OFF 사용·재택·잔여 | 리드 | FR-STL-01 |
 | 개발 | GET / PUT / DELETE | /dev/clock | 현재 시각 조회·변경·초기화 | 개발 모드 | 참고사항 |
 
 **미기록 퇴근 흐름**
@@ -368,6 +366,12 @@ backend/src/
 - 상태: WORKING(출근) / LEFT(퇴근) / REMOTE(재택 근무 중) / ANNUAL(연차) / HALF_OFF(반일 OFF, 출근 전) / PENDING_APPROVAL(승인 대기) / NOT_CHECKED_IN(미출근) / DAY_OFF(주말·공휴일)
 - 판정은 `domain/policy/board.policy.ts` 순수 함수. 저장소의 날짜별 조회(출퇴근·신청 날짜)를 모아 넘긴다 → query 계층 없이도 테스트 가능해 팀 보드는 저장소를 쓴다
 - 팀원 응답은 `{ userId, name, status }`만, 리드는 근무 유형·출퇴근 시각·지각·조퇴·근무시간·직접 입력 여부·`pastTen`(10:00 지나도 미출근)까지
+
+**월별 정산 (`GET /lead/settlements?month=`)**
+- 응답: `{ month, asOf, rows: [{ userId, name, workDays, workedMinutes, lateCount, earlyLeaveCount, manualCount, missingCount, annualUsedDays, halfOffUsed, remote: { used, exceptions }, annualBalanceDays, halfOffBalance }] }`
+- 판정은 `domain/policy/settlement.policy.ts` 순수 함수. 출퇴근에 저장해 둔 판정(isLate·isEarlyLeave·workedMinutes)을 모으기만 한다 (판정 결과 저장의 이유)
+- 처음 설계는 `infrastructure/query`에서 바로 집계였으나, app → infrastructure 의존이 생겨 팀 보드와 같은 "저장소 + 순수 정책"으로 바꿈
+- 잔여 기준일(`asOf`): 지난달은 말일, 이번 달·미래 달은 오늘. 기준일까지 효력이 생긴 원장만 합산 → 지난달 정산이 이후 신청으로 바뀌지 않는다 (결정 A18)
 
 **IP 검사 (IpGuard, 전역)**
 - 가드 순서: JwtAuthGuard → IpGuard → RolesGuard. 재택 IP는 신청한 본인에게만 열려야 해서 사용자를 먼저 안다

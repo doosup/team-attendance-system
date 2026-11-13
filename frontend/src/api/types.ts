@@ -114,3 +114,25 @@ export interface ServerClock {
   now: string;
   overridden: boolean;
 }
+
+export interface SettlementRow {
+  userId: number;
+  name: string;
+  workDays: number;
+  workedMinutes: number;
+  lateCount: number;
+  earlyLeaveCount: number;
+  manualCount: number;
+  missingCount: number;
+  annualUsedDays: number;
+  halfOffUsed: number;
+  annualBalanceDays: number;
+  halfOffBalance: number;
+  remote: { used: number; exceptions: number };
+}
+
+export interface MonthlySettlement {
+  month: string;
+  asOf: string;
+  rows: SettlementRow[];
+}
