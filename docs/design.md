@@ -298,6 +298,9 @@ backend/src/
 
 **공통 규칙**
 - 모든 요청은 IpGuard를 통과해야 한다. 로그인 외에는 JWT(12시간) 필요, 만료·누락 시 401
+- JWT는 `Authorization: Bearer <token>`. 서명 비밀키 `JWT_SECRET`은 `npm run setup`이 `backend/.env`(gitignore)에 무작위로 만든다. 없으면 서버가 시작하지 않음
+- 토큰이 유효해도 요청마다 사용자를 다시 조회해 퇴사(소프트 삭제)자는 401. 역할도 토큰이 아니라 DB 값을 쓴다
+- 로그인 실패는 없는 아이디·틀린 비밀번호 모두 같은 `INVALID_CREDENTIALS` (응답 시간도 같게 맞춰 아이디 존재 여부를 숨김)
 - 응답: 성공은 `{ data }`, 실패는 `{ error: { code, message } }`
 - 날짜 파라미터는 `YYYY-MM-DD`(KST), 시각은 ISO 8601
 - 모든 시각 판정은 서버 Clock 기준. 브라우저가 보낸 "현재 시각"은 받지 않음
@@ -420,6 +423,6 @@ backend/src/
 
 ### ADR-007 저장소는 인터페이스(domain)와 Prisma 구현(infrastructure)으로 분리
 - **결정:** domain/repository에는 abstract class만, infrastructure/prisma/repository에 Prisma 구현, 모듈에서 연결
-- **이유:** **의존성 역전 원칙(DIP).** 업무 규칙(domain)이 세부 도구(Prisma·Nest)에 기대지 않고 둘 다 약속(인터페이스)에 기대게 함. domain에는 프레임워크 import가 없어 "이 팀의 근태 제도"만 코드로 남고, ORM·DB를 바꾸거나(SQLite → PostgreSQL) 버전을 올려도 domain은 그대로 (과제가 요구한 "향후 확장을 고려한 설계"). 테스트는 jest mock 또는 메모리 가짜 저장소 모두 가능하며, 가짜 저장소는 상태를 기억해 "저장 → 조회" 흐름 테스트가 자연스러움
+- **이유:** **의존성 역전 원칙(DIP).** 업무 규칙(domain)이 세부 도구(Prisma·Nest)에 기대지 않고 둘 다 약속(인터페이스)에 기대게 함. domain에는 프레임워크 import가 없어 "이 팀의 근태 제도"만 코드로 남고, ORM·DB를 바꾸거나(SQLite → PostgreSQL) 버전을 올려도 domain은 그대로. 테스트는 jest mock 또는 메모리 가짜 저장소 모두 가능하며, 가짜 저장소는 상태를 기억해 "저장 → 조회" 흐름 테스트가 자연스러움
 - **대안:** domain의 저장소 클래스가 PrismaService를 직접 사용 → 파일이 적고 익숙하며 유스케이스 테스트도 jest mock으로 가능(테스트 가능성은 차이 없음). 다만 domain이 Prisma를 import해 DB·ORM 교체 시 domain도 수정해야 하고 헥사고날 원칙과 어긋남. 실용적 타협으로는 타당하지만, 이번에는 설계 의도를 끝까지 일관되게 지키는 쪽을 선택
 - **감수한 점:** 저장소마다 인터페이스 파일 하나 추가. Prisma 쿼리 자체의 정확성은 통합 테스트로 확인

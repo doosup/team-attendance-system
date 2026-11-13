@@ -20,7 +20,7 @@ const LAB_IP = '127.0.0.1';
 const prisma = new PrismaClient();
 
 async function main() {
-  const passwordHash = await hash(PASSWORD, 10);
+  const passwordHash = await hash(PASSWORD, 12);
   for (const u of USERS) {
     await prisma.user.upsert({
       where: { loginId: u.loginId },
