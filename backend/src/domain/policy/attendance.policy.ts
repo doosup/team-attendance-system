@@ -75,3 +75,27 @@ export function expectedCheckOutAt(
   if (includesLunch(checkInAt, end)) end = new Date(end.getTime() + HOUR);
   return end;
 }
+
+const CHECK_OUT_OPEN = 16 * HOUR; // 16:00:00부터
+
+/** 퇴근 버튼 시각 제한: 일반일만 16:00:00부터 (반일 OFF·긴급 출근·주말 근무는 제한 없음, A6) */
+export function assertCheckOutTime(now: Date, dayType: DayType): void {
+  if (dayType === 'FULL_DAY' && msOfDayKst(now) < CHECK_OUT_OPEN) {
+    throw new CustomException('CHECK_OUT_TOO_EARLY');
+  }
+}
+
+/** 근무시간 = 퇴근 − 출근 − (점심 전체 포함 시 1시간). 조퇴 = 기준 근무시간 미만 */
+export function judgeWork(
+  checkInAt: Date,
+  checkOutAt: Date,
+  dayType: DayType,
+): { workedMinutes: number; isEarlyLeave: boolean } {
+  let ms = checkOutAt.getTime() - checkInAt.getTime();
+  if (includesLunch(checkInAt, checkOutAt)) ms -= HOUR;
+  const required = requiredWorkMs(dayType);
+  return {
+    workedMinutes: Math.floor(ms / 60000),
+    isEarlyLeave: required !== null && ms < required,
+  };
+}

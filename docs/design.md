@@ -365,7 +365,8 @@ backend/src/
 | CHECK_IN_TOO_EARLY | 422 | 07:00:00 이전 출근 |
 | ALREADY_CHECKED_IN | 409 | 중복 출근 |
 | NOT_CHECKED_IN | 409 | 출근 없이 퇴근 |
-| CHECK_OUT_TOO_EARLY | 422 | 16:00:00 이전 퇴근 (반일 OFF 날 제외) |
+| ALREADY_CHECKED_OUT | 409 | 같은 날 두 번째 퇴근 (처음 기록을 덮어쓰지 않음) |
+| CHECK_OUT_TOO_EARLY | 422 | 일반일 16:00:00 이전 퇴근 (반일 OFF·긴급 출근·주말 근무 날 제외) |
 | PENDING_MANUAL_CHECKOUT | 409 | 미기록 퇴근 입력 전 퇴근 시도 |
 | MANUAL_CHECKOUT_OUT_OF_RANGE | 422 | 직접 입력 시각이 출근~23:59:59 밖 |
 | INVALID_DATE_RANGE | 422 | 종료일이 시작일보다 이르거나, 하루만 가능한 종류에 기간을 넣음 |

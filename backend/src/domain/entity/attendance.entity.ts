@@ -1,3 +1,5 @@
+import { judgeWork } from '../policy/attendance.policy';
+
 export type DayType =
   'FULL_DAY' | 'HALF_DAY_OFF' | 'EMERGENCY_WORK' | 'WEEKEND_WORK';
 export type CheckOutSource = 'BUTTON' | 'MANUAL';
@@ -48,6 +50,22 @@ export class Attendance {
   get id(): number {
     if (this.props.id === null) throw new Error('저장 전 출근 기록');
     return this.props.id;
+  }
+
+  /** 퇴근 기록과 판정 (버튼·직접 입력 공통). 시각 제한·범위 검사는 호출하는 쪽에서 */
+  checkOut(at: Date, source: CheckOutSource, ip: string | null): void {
+    const { workedMinutes, isEarlyLeave } = judgeWork(
+      this.props.checkInAt,
+      at,
+      this.props.dayType,
+    );
+    Object.assign(this.props, {
+      checkOutAt: at,
+      checkOutSource: source,
+      checkOutIp: ip,
+      workedMinutes,
+      isEarlyLeave,
+    });
   }
 
   get hasCheckedOut(): boolean {

@@ -1,9 +1,11 @@
 import { DayRequest } from '../repository/request-day.repository';
 import { kstAt } from '../value/work-date';
 import {
+  assertCheckOutTime,
   expectedCheckOutAt,
   includesLunch,
   judgeCheckIn,
+  judgeWork,
   resolveDay,
 } from './attendance.policy';
 
@@ -187,5 +189,118 @@ describe('점심 구간 포함 includesLunch (11:30~12:30 전체가 들어갈 �
     ['12:11:00 → 20:00:00 (점심 먹고 출근)', '12:11:00', '20:00:00', false],
   ])('%s → %s', (_, from, to, expected) => {
     expect(includesLunch(at(from), at(to))).toBe(expected);
+  });
+});
+
+describe('퇴근 시각 제한 assertCheckOutTime', () => {
+  it('일반일 15:59:59 퇴근은 거부한다 (CHECK_OUT_TOO_EARLY)', () => {
+    expect(codeOf(() => assertCheckOutTime(at('15:59:59'), 'FULL_DAY'))).toBe(
+      'CHECK_OUT_TOO_EARLY',
+    );
+  });
+
+  it('일반일 16:00:00 퇴근은 등록된다', () => {
+    expect(codeOf(() => assertCheckOutTime(at('16:00:00'), 'FULL_DAY'))).toBe(
+      'OK',
+    );
+  });
+
+  it.each(['HALF_DAY_OFF', 'EMERGENCY_WORK', 'WEEKEND_WORK'] as const)(
+    '%s 날은 16:00 전에도 퇴근할 수 있다',
+    (dayType) => {
+      expect(codeOf(() => assertCheckOutTime(at('11:00:00'), dayType))).toBe(
+        'OK',
+      );
+    },
+  );
+});
+
+describe('근무시간·조퇴 judgeWork', () => {
+  it.each([
+    [
+      '일반일 09:00→18:00 = 8시간(점심 차감), 정상',
+      'FULL_DAY',
+      '09:00:00',
+      '18:00:00',
+      480,
+      false,
+    ],
+    [
+      '일반일 09:00→17:59:59 = 7시간 59분, 조퇴',
+      'FULL_DAY',
+      '09:00:00',
+      '17:59:59',
+      479,
+      true,
+    ],
+    [
+      '일반일 12:11→20:11 = 점심 안 겹쳐 8시간, 정상',
+      'FULL_DAY',
+      '12:11:00',
+      '20:11:00',
+      480,
+      false,
+    ],
+    [
+      '일반일 07:00→16:00 = 8시간, 정상',
+      'FULL_DAY',
+      '07:00:00',
+      '16:00:00',
+      480,
+      false,
+    ],
+    [
+      '반일 OFF 07:00→11:00 = 4시간, 정상',
+      'HALF_DAY_OFF',
+      '07:00:00',
+      '11:00:00',
+      240,
+      false,
+    ],
+    [
+      '반일 OFF 12:30→16:30 = 4시간, 정상',
+      'HALF_DAY_OFF',
+      '12:30:00',
+      '16:30:00',
+      240,
+      false,
+    ],
+    [
+      '반일 OFF 11:00→16:00 = 점심 차감 4시간, 정상',
+      'HALF_DAY_OFF',
+      '11:00:00',
+      '16:00:00',
+      240,
+      false,
+    ],
+    [
+      '반일 OFF 10:00→14:00 = 점심 차감 3시간, 조퇴',
+      'HALF_DAY_OFF',
+      '10:00:00',
+      '14:00:00',
+      180,
+      true,
+    ],
+    [
+      '긴급 출근 10:00→12:00 = 2시간, 조퇴 판정 없음',
+      'EMERGENCY_WORK',
+      '10:00:00',
+      '12:00:00',
+      120,
+      false,
+    ],
+    [
+      '주말 근무 10:00→13:00 = 점심 차감 2시간, 조퇴 판정 없음',
+      'WEEKEND_WORK',
+      '10:00:00',
+      '13:00:00',
+      120,
+      false,
+    ],
+  ] as const)('%s', (_, dayType, from, to, minutes, early) => {
+    expect(judgeWork(at(from), at(to), dayType)).toEqual({
+      workedMinutes: minutes,
+      isEarlyLeave: early,
+    });
   });
 });

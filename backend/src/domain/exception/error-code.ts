@@ -10,6 +10,10 @@ export const ERROR_MESSAGES = {
   ON_ANNUAL_LEAVE:
     '오늘은 연차일입니다. 출근이 필요하면 리드에게 당일 취소를 요청하세요',
   WEEKEND_WORK_NOT_APPROVED: '승인된 주말·공휴일 근무 신청이 없습니다',
+  NOT_CHECKED_IN: '오늘 출근 기록이 없습니다',
+  ALREADY_CHECKED_OUT: '오늘은 이미 퇴근했습니다',
+  CHECK_OUT_TOO_EARLY: '퇴근은 16:00부터 등록할 수 있습니다',
+  PENDING_MANUAL_CHECKOUT: '먼저 퇴근을 찍지 않은 날의 퇴근 시각을 입력하세요',
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

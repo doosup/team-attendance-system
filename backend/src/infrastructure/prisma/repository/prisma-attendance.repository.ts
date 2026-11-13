@@ -27,6 +27,21 @@ export class PrismaAttendanceRepository extends AttendanceRepository {
     return m && AttendanceMapper.toEntity(m);
   }
 
+  async findByUserAndMonth(userId: number, month: string) {
+    const rows = await this.prisma.attendance.findMany({
+      where: { userId, workDate: { startsWith: `${month}-` } },
+      orderBy: { workDate: 'asc' },
+    });
+    return rows.map((m) => AttendanceMapper.toEntity(m));
+  }
+
+  async save(attendance: Attendance) {
+    await this.prisma.attendance.update({
+      where: { id: attendance.id },
+      data: AttendanceMapper.toData(attendance),
+    });
+  }
+
   async create(attendance: Attendance) {
     try {
       const m = await this.prisma.attendance.create({
