@@ -154,6 +154,9 @@ erDiagram
 - `grantId` 자기 참조: 반일 OFF는 지급분마다 만료일이 달라, 어느 지급분을 쓰고 만료됐는지 연결 (만료 임박 순 사용, 안 쓴 것만 만료)
 - `dedupKey` 유일: 적립·만료는 조회 시점에 "생겼어야 할 것"을 계산해 넣으므로 중복 실행을 DB가 차단. Clock을 앞뒤로 옮겨도 결과 동일. 예: `ACCRUE:ANNUAL:3:2026-02-01`
 - null 규칙(ACCRUE엔 grantId 없음, OFF의 USE엔 반드시 있음)은 코드와 테스트로 보장
+- 동기화는 `app/balance/sync-ledger.ts` 한 곳: 잔여·원장 조회와 신청(잔여 검사) 전에 "오늘까지 생겼어야 할" 적립·만료를 채운다
+- 합산 규칙: 적립·만료는 `effectiveDate ≤ 오늘`인 것만, 사용·복원은 날짜와 무관(신청 시 차감) → 시계를 앞뒤로 옮겨도 그 시점의 잔여가 나옴
+- dedupKey: 연차 `ACCRUE:ANNUAL:<userId>:<날짜>`, 주말 근무 OFF `ACCRUE:HALF_OFF:attendance:<출퇴근 id>`, 만료 `EXPIRE:HALF_OFF:<지급 id>:<회차>`
 
 ### AuditLog
 - `actorId` null = 로그인 실패·IP 차단처럼 아직 누군지 모르는 경우
@@ -384,6 +387,7 @@ backend/src/
 | CANNOT_DELETE_LAST_IP | 409 | 마지막 남은 연구실 IP 삭제 시도 |
 | ON_ANNUAL_LEAVE | 409 | 승인된 연차일에 출근 시도 (출근이 필요하면 리드 당일 취소 → 긴급 출근) |
 | WEEKEND_WORK_NOT_APPROVED | 403 | 승인된 주말·공휴일 근무 신청 없이 주말·공휴일 출근 (FR-ATT-04) |
+| USER_NOT_FOUND | 404 | 리드가 없는(또는 퇴사한) 사용자의 원장 조회 |
 | VALIDATION_FAILED | 400 | 입력 형식 오류 (DTO 검증) |
 
 재택 한도 초과는 에러가 아니라 예외 신청(`isOverLimit: true`)으로 접수된다.

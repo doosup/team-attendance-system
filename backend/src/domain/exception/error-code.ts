@@ -17,6 +17,7 @@ export const ERROR_MESSAGES = {
   MANUAL_CHECKOUT_OUT_OF_RANGE:
     '퇴근 시각은 그날 출근 시각 이후부터 23:59:59까지 입력할 수 있습니다',
   MANUAL_CHECKOUT_NOT_PENDING: '직접 입력할 미기록 퇴근 건이 아닙니다',
+  USER_NOT_FOUND: '사용자를 찾을 수 없습니다',
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

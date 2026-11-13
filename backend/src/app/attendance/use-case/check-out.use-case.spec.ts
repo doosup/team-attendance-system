@@ -2,6 +2,7 @@ import { CustomException } from '../../../domain/exception/custom.exception';
 import { kstAt } from '../../../domain/value/work-date';
 import { FixedClock } from '../../../../test/fakes/fixed-clock';
 import { InMemoryAttendanceRepository } from '../../../../test/fakes/in-memory-attendance.repository';
+import { InMemoryLedgerRepository } from '../../../../test/fakes/in-memory-ledger.repository';
 import { InMemoryRequestDayRepository } from '../../../../test/fakes/in-memory-request-day.repository';
 import { KIM } from '../../../../test/fakes/users';
 import { CheckInUseCase } from './check-in.use-case';
@@ -12,13 +13,16 @@ describe('CheckOutUseCase', () => {
   let attendances: InMemoryAttendanceRepository;
   let checkIn: CheckInUseCase;
   let checkOut: CheckOutUseCase;
+  let ledger: InMemoryLedgerRepository;
+  let requestDays: InMemoryRequestDayRepository;
 
   beforeEach(() => {
     clock = new FixedClock('2026-11-13', '09:00:00');
     attendances = new InMemoryAttendanceRepository();
-    const requestDays = new InMemoryRequestDayRepository();
+    requestDays = new InMemoryRequestDayRepository();
+    ledger = new InMemoryLedgerRepository();
     checkIn = new CheckInUseCase(clock, attendances, requestDays);
-    checkOut = new CheckOutUseCase(clock, attendances);
+    checkOut = new CheckOutUseCase(clock, attendances, ledger);
   });
 
   const out = () => checkOut.execute({ user: KIM, ip: '127.0.0.1' });
@@ -78,5 +82,40 @@ describe('CheckOutUseCase', () => {
     await checkIn.execute({ user: KIM, ip: '127.0.0.1' });
     clock.at('2026-11-14', '00:00:01');
     expect(await codeOf(out())).toBe('PENDING_MANUAL_CHECKOUT');
+  });
+
+  it('승인된 주말 근무를 퇴근하면 반일 OFF 1개를 지급한다 (30일 뒤 만료, 결정 7)', async () => {
+    requestDays.rows.push({
+      userId: KIM.id,
+      date: '2026-11-14',
+      requestDayId: 9,
+      type: 'WEEKEND_WORK',
+      requestStatus: 'APPROVED',
+      dayStatus: 'ACTIVE',
+      cancelType: null,
+      isOverLimit: false,
+    });
+    clock.at('2026-11-14', '10:00:00');
+    await checkIn.execute({ user: KIM, ip: '127.0.0.1' });
+    clock.at('2026-11-14', '13:00:00');
+    await out();
+    expect(ledger.rows.map((e) => e.props)).toEqual([
+      expect.objectContaining({
+        userId: KIM.id,
+        kind: 'HALF_OFF',
+        event: 'ACCRUE',
+        halfDays: 1,
+        effectiveDate: '2026-11-14',
+        expiresOn: '2026-12-14',
+        requestDayId: 9,
+      }),
+    ]);
+  });
+
+  it('평일 퇴근은 OFF를 지급하지 않는다', async () => {
+    await checkIn.execute({ user: KIM, ip: '127.0.0.1' });
+    clock.at('2026-11-13', '18:00:00');
+    await out();
+    expect(ledger.rows).toHaveLength(0);
   });
 });
