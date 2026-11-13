@@ -102,8 +102,8 @@ erDiagram
         int id PK
         int actorId FK "nullable"
         AuditAction action
-        string targetType
-        int targetId
+        string targetType "nullable"
+        int targetId "nullable"
         json payload
         string ip
         datetime occurredAt "Clock 기준"
@@ -157,7 +157,7 @@ erDiagram
 
 ### AuditLog
 - `actorId` null = 로그인 실패·IP 차단처럼 아직 누군지 모르는 경우
-- `targetType + targetId`: 여러 테이블을 가리키므로 FK 없음 (이력·대상 모두 지우지 않아 문제없음)
+- `targetType + targetId`: 여러 테이블을 가리키므로 FK 없음 (이력·대상 모두 지우지 않아 문제없음). 가리킬 행이 없는 행동(LOGIN_FAIL·IP_BLOCKED·CLOCK_CHANGE)은 둘 다 null
 - `payload` Json: 행동마다 남길 내용이 다름 (SQLite Json은 Prisma 6.2+)
 - 시각 두 개: `occurredAt`(Clock 기준 업무 시각), `createdAt`(실제 기록 시각) → 시각을 바꿔 테스트한 기록인지 구분
 
