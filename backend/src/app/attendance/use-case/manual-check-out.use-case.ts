@@ -1,0 +1,43 @@
+import { Injectable } from '@nestjs/common';
+import { User } from '../../../domain/entity/user.entity';
+import { CustomException } from '../../../domain/exception/custom.exception';
+import { assertManualCheckOutRange } from '../../../domain/policy/attendance.policy';
+import { Clock } from '../../../domain/port/clock.port';
+import { AttendanceRepository } from '../../../domain/repository/attendance.repository';
+import { workDateOf } from '../../../domain/value/work-date';
+import { UseCase } from '../../use-case.interface';
+import { AttendanceResult } from '../dto/check-in.dto';
+
+interface Input {
+  user: User;
+  attendanceId: number;
+  checkOutAt: Date;
+  ip: string;
+}
+
+// 직전 근무일의 미기록 퇴근 1건만 입력받는다 (결정 9). 16:00 제한은 없고 조퇴 판정은 한다.
+// shortcut: MANUAL_CHECK_OUT 이력은 ATT-6, 주말 근무 OFF 지급은 ATT-16에서 연결.
+@Injectable()
+export class ManualCheckOutUseCase implements UseCase<Input, AttendanceResult> {
+  constructor(
+    private readonly clock: Clock,
+    private readonly attendances: AttendanceRepository,
+  ) {}
+
+  async execute({ user, attendanceId, checkOutAt, ip }: Input) {
+    const today = workDateOf(this.clock.now());
+    const pending = await this.attendances.findLatestBefore(user.id, today);
+    // 남의 기록·오늘 기록·이미 입력한 기록 모두 같은 응답 (존재 여부를 드러내지 않음)
+    if (!pending || pending.id !== attendanceId || pending.hasCheckedOut) {
+      throw new CustomException('MANUAL_CHECKOUT_NOT_PENDING');
+    }
+    assertManualCheckOutRange(
+      pending.props.checkInAt,
+      checkOutAt,
+      pending.props.workDate,
+    );
+    pending.checkOut(checkOutAt, 'MANUAL', ip);
+    await this.attendances.save(pending);
+    return AttendanceResult.from(pending);
+  }
+}

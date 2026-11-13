@@ -54,6 +54,16 @@ describe('OverridableClock', () => {
     expect(clock.isOverridden()).toBe(true);
   });
 
+  it('업무 시각은 초 단위로 자른다: 10:00:00.500은 10:00:00이다 (결정 원칙 3)', () => {
+    real.current = at('2026-11-13T01:00:00.500Z');
+    expect(clock.now()).toEqual(at('2026-11-13T01:00:00.000Z'));
+  });
+
+  it('바꾼 시각에 ms가 있어도 초 단위로 자른다', () => {
+    clock.set(at('2026-11-13T09:59:59.999+09:00'));
+    expect(clock.now()).toEqual(at('2026-11-13T09:59:59.000+09:00'));
+  });
+
   it('초기화하면 실제 시각으로 돌아간다', () => {
     clock.set(at('2026-02-01T08:00:00+09:00'));
     clock.reset();

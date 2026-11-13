@@ -8,8 +8,10 @@ export class OverridableClock extends Clock implements ClockControl {
     super();
   }
 
+  // 업무 시각은 초 단위로 자른다: ms 차이로 지각·조퇴가 갈리지 않게 (결정 원칙 3)
   now(): Date {
-    return new Date(this.real.now().getTime() + (this.offsetMs ?? 0));
+    const ms = this.real.now().getTime() + (this.offsetMs ?? 0);
+    return new Date(ms - (ms % 1000));
   }
 
   set(at: Date): void {
