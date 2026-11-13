@@ -328,7 +328,7 @@ backend/src/
 | 잔여 | GET | /balances/me/ledger | 내 원장 내역 | 로그인 | FR-BAL-01 |
 | 대시보드 | GET | /dashboard/team?date= | 팀원별 그날 상태. 팀원은 상태만, 리드는 시각·지각·조퇴·10시 경과 미출근 포함 | 로그인 | FR-DSH-01 |
 | 대시보드 | GET | /dashboard/me/missing | 내 퇴근 미기록·직접 입력 건 | 로그인 | FR-DSH-01 |
-| 리드 | GET | /lead/requests?status=PENDING | 대기 목록 (시작일 가까운 순, 예외 신청 표시) | 리드 | FR-REQ-02 |
+| 리드 | GET | /lead/requests?status=PENDING | 상태별 목록, 기본 대기 (시작일 가까운 순, 신청자 이름·예외 신청 표시) | 리드 | FR-REQ-02 |
 | 리드 | POST | /lead/requests/:id/approve | 승인 | 리드 | FR-REQ-02 |
 | 리드 | POST | /lead/requests/:id/reject | 반려 `{ rejectReason }` | 리드 | FR-REQ-02 |
 | 리드 | POST | /lead/requests/:id/days/:date/cancel | 당일 취소 `{ cancelReason }` → 그날 긴급 출근 | 리드 | FR-REQ-01 |
@@ -392,6 +392,7 @@ backend/src/
 | OVERLAPPING_REQUEST | 409 | 이미 신청이 있는 날짜와 겹침 |
 | SAME_DAY_CANCEL_LEAD_ONLY | 403 | 팀원의 당일 취소 시도 |
 | INVALID_STATUS_TRANSITION | 409 | 이미 처리된 신청 승인·반려·취소 |
+| REQUEST_NOT_FOUND | 404 | 없는 신청을 승인·반려·취소 |
 | INVALID_IP_FORMAT | 422 | IP 형식 오류 (연구실 IP, 재택·주말 근무 신청) |
 | OVER_LIMIT_REASON_REQUIRED | 422 | 재택 한도를 넘는 예외 신청에 사유가 없음 |
 | CANNOT_DELETE_CURRENT_IP | 409 | 현재 접속 중인 IP 삭제 시도 |

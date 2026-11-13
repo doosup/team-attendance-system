@@ -23,6 +23,10 @@ export class InMemoryUserRepository extends UserRepository {
     );
   }
 
+  findAll() {
+    return Promise.resolve(this.active());
+  }
+
   private active() {
     return this.users.filter((u) => !this.deletedIds.has(u.id));
   }

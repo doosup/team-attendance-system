@@ -22,6 +22,14 @@ export class PrismaUserRepository extends UserRepository {
     return m && UserMapper.toEntity(m);
   }
 
+  async findAll(): Promise<User[]> {
+    const rows = await this.tx.user.findMany({
+      where: { deletedAt: null },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((m) => UserMapper.toEntity(m));
+  }
+
   async findByLoginId(loginId: string): Promise<User | null> {
     const m = await this.tx.user.findFirst({
       where: { loginId, deletedAt: null },

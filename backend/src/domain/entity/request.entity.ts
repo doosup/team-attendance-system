@@ -4,6 +4,7 @@ import {
   RequestStatus,
   RequestType,
 } from '../repository/request-day.repository';
+import { CustomException } from '../exception/custom.exception';
 import { User } from './user.entity';
 
 export interface RequestDayProps {
@@ -74,6 +75,37 @@ export class Request {
         cancelReason: null,
       })),
     });
+  }
+
+  /** 리드 승인: 대기 상태만 (결정 14) */
+  approve(leadId: number, now: Date): void {
+    this.assertPending();
+    Object.assign(this.props, {
+      status: 'APPROVED',
+      decidedById: leadId,
+      decidedAt: now,
+    });
+  }
+
+  /** 리드 반려: 대기 상태만, 사유 필수 (검증은 DTO) */
+  reject(leadId: number, reason: string, now: Date): void {
+    this.assertPending();
+    Object.assign(this.props, {
+      status: 'REJECTED',
+      decidedById: leadId,
+      decidedAt: now,
+      rejectReason: reason,
+    });
+  }
+
+  get dayIds(): number[] {
+    return this.props.days.flatMap((d) => (d.id === null ? [] : [d.id]));
+  }
+
+  private assertPending(): void {
+    if (this.props.status !== 'PENDING') {
+      throw new CustomException('INVALID_STATUS_TRANSITION');
+    }
   }
 
   get id(): number {

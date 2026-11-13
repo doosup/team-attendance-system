@@ -30,6 +30,8 @@ export const ERROR_MESSAGES = {
   OVER_LIMIT_REASON_REQUIRED:
     '재택 한도(월 2회)를 넘는 예외 신청은 사유가 필요합니다',
   IP_NOT_ALLOWED: '등록된 IP가 아닙니다',
+  INVALID_STATUS_TRANSITION: '이미 처리된 신청입니다',
+  REQUEST_NOT_FOUND: '신청을 찾을 수 없습니다',
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

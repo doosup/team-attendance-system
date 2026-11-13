@@ -145,3 +145,38 @@ export function weekendWorkOffGrant(a: {
     dedupKey: `ACCRUE:HALF_OFF:attendance:${a.attendanceId}`,
   };
 }
+
+/**
+ * 반려·취소된 날짜 행의 차감을 되돌린다 (결정 12·14). 같은 양을 같은 지급분(grantId)으로 되돌려
+ * 복원된 OFF는 원래 만료일을 유지한다. 이미 복원한 날짜는 건너뛴다.
+ */
+export function restoreDrafts(
+  entries: LedgerEntry[],
+  requestDayIds: number[],
+): LedgerDraft[] {
+  const targets = new Set(requestDayIds);
+  const restored = new Set(
+    entries
+      .filter((e) => e.props.event === 'RESTORE')
+      .map((e) => e.props.requestDayId),
+  );
+  return entries
+    .filter(
+      (e) =>
+        e.props.event === 'USE' &&
+        e.props.requestDayId !== null &&
+        targets.has(e.props.requestDayId) &&
+        !restored.has(e.props.requestDayId),
+    )
+    .map(({ props: p }) => ({
+      userId: p.userId,
+      kind: p.kind,
+      event: 'RESTORE' as const,
+      halfDays: -p.halfDays,
+      effectiveDate: p.effectiveDate,
+      expiresOn: null,
+      grantId: p.grantId,
+      requestDayId: p.requestDayId,
+      dedupKey: null,
+    }));
+}
