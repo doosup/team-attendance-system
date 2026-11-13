@@ -10,6 +10,7 @@ import { LeadModule } from './app/lead/lead.module';
 import { RequestModule } from './app/request/request.module';
 import { DevModule } from './app/dev/dev.module';
 import { DomainExceptionFilter } from './common/filters/domain-exception.filter';
+import { IpGuard } from './common/guards/ip.guard';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -52,8 +53,9 @@ const isDev = process.env.NODE_ENV !== 'production';
     { provide: APP_PIPE, useValue: validationPipe },
     { provide: APP_FILTER, useClass: DomainExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
-    // 등록 순서대로 실행: 로그인 확인 → 역할 확인. (IpGuard는 ATT-14에서 맨 앞에)
+    // 등록 순서대로 실행: 로그인 확인 → IP 확인(재택 IP는 본인만이라 사용자가 필요) → 역할 확인
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: IpGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })

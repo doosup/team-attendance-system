@@ -1,9 +1,11 @@
 import { Global, Module } from '@nestjs/common';
+import { AllowedIpRepository } from '../../domain/repository/allowed-ip.repository';
 import { AttendanceRepository } from '../../domain/repository/attendance.repository';
 import { LedgerRepository } from '../../domain/repository/ledger.repository';
 import { RequestDayRepository } from '../../domain/repository/request-day.repository';
 import { RequestRepository } from '../../domain/repository/request.repository';
 import { UserRepository } from '../../domain/repository/user.repository';
+import { PrismaAllowedIpRepository } from './repository/prisma-allowed-ip.repository';
 import { PrismaAttendanceRepository } from './repository/prisma-attendance.repository';
 import { PrismaLedgerRepository } from './repository/prisma-ledger.repository';
 import { PrismaRequestDayRepository } from './repository/prisma-request-day.repository';
@@ -17,6 +19,7 @@ const bindings = [
   { provide: RequestDayRepository, useClass: PrismaRequestDayRepository },
   { provide: LedgerRepository, useClass: PrismaLedgerRepository },
   { provide: RequestRepository, useClass: PrismaRequestRepository },
+  { provide: AllowedIpRepository, useClass: PrismaAllowedIpRepository },
 ];
 
 @Global()

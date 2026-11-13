@@ -70,4 +70,23 @@ export class InMemoryRequestDayRepository extends RequestDayRepository {
         .map((r) => r.date),
     );
   }
+
+  findApprovedWindows(date: string, ip: string) {
+    return Promise.resolve(
+      (this.requests?.rows ?? []).flatMap((r) =>
+        r.props.status === 'APPROVED' &&
+        (r.props.type === 'REMOTE' || r.props.type === 'WEEKEND_WORK') &&
+        r.props.ip === ip &&
+        r.props.days.some((d) => d.date === date && d.status === 'ACTIVE')
+          ? [
+              {
+                userId: r.props.userId,
+                startTime: r.props.startTime ?? '00:00',
+                endTime: r.props.endTime ?? '00:00',
+              },
+            ]
+          : [],
+      ),
+    );
+  }
 }

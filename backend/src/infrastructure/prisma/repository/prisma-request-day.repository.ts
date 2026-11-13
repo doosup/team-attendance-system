@@ -56,4 +56,34 @@ export class PrismaRequestDayRepository extends RequestDayRepository {
     });
     return rows.map((r) => r.date);
   }
+
+  async findApprovedWindows(date: string, ip: string) {
+    const rows = await this.tx.requestDay.findMany({
+      where: {
+        date,
+        status: 'ACTIVE',
+        request: {
+          status: 'APPROVED',
+          type: { in: ['REMOTE', 'WEEKEND_WORK'] },
+          ip,
+        },
+      },
+      select: {
+        userId: true,
+        request: { select: { startTime: true, endTime: true } },
+      },
+    });
+    // 재택·주말 근무는 신청 때 시간대가 필수라 null이 없지만, 혹시 없으면 열지 않는다
+    return rows.flatMap((r) =>
+      r.request.startTime && r.request.endTime
+        ? [
+            {
+              userId: r.userId,
+              startTime: r.request.startTime,
+              endTime: r.request.endTime,
+            },
+          ]
+        : [],
+    );
+  }
 }
