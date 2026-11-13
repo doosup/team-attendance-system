@@ -1,5 +1,8 @@
 // 2026년 대한민국 공휴일 (대체공휴일 포함, 결정 4). 다른 연도는 배열을 추가한다.
 // 확인 필요: 제헌절(7/17) 공휴일 재지정 여부, 노동절(5/1)은 관공서 공휴일이 아니라 제외.
+// 공휴일 데이터가 있는 연도. 신청은 이 연도 안에서만 받는다.
+export const HOLIDAY_YEARS: ReadonlySet<number> = new Set([2026]);
+
 export const HOLIDAYS: ReadonlySet<string> = new Set([
   '2026-01-01', // 신정
   '2026-02-16', // 설날 연휴

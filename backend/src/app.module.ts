@@ -7,6 +7,7 @@ import { AttendanceModule } from './app/attendance/attendance.module';
 import { AuthModule } from './app/auth/auth.module';
 import { BalanceModule } from './app/balance/balance.module';
 import { LeadModule } from './app/lead/lead.module';
+import { RequestModule } from './app/request/request.module';
 import { DevModule } from './app/dev/dev.module';
 import { DomainExceptionFilter } from './common/filters/domain-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -43,6 +44,7 @@ const isDev = process.env.NODE_ENV !== 'production';
     AuthModule,
     AttendanceModule,
     BalanceModule,
+    RequestModule,
     LeadModule,
     ...(isDev ? [DevModule] : []),
   ],

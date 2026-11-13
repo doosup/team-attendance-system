@@ -374,7 +374,7 @@ backend/src/
 | PENDING_MANUAL_CHECKOUT | 409 | 미기록 퇴근 입력 전 퇴근 시도 |
 | MANUAL_CHECKOUT_OUT_OF_RANGE | 422 | 직접 입력 시각이 출근~23:59:59 밖 |
 | MANUAL_CHECKOUT_NOT_PENDING | 409 | 직접 입력 대상(직전 근무일의 미기록 1건)이 아님. 남의 기록·오늘 기록·이미 입력한 기록 모두 같은 응답 |
-| INVALID_DATE_RANGE | 422 | 종료일이 시작일보다 이르거나, 하루만 가능한 종류에 기간을 넣음 |
+| INVALID_DATE_RANGE | 422 | 종료일이 시작일보다 이르거나, 하루만 가능한 종류에 기간을 넣음, 공휴일 데이터가 없는 연도 |
 | NO_BUSINESS_DAY_IN_RANGE | 422 | 연차·재택 기간에 영업일이 하나도 없음 |
 | REQUEST_DEADLINE_PASSED | 422 | 시작일의 직전 영업일 17:00:00 이후 신청·본인 취소 |
 | INSUFFICIENT_BALANCE | 422 | 연차·OFF 잔여 부족 |
@@ -383,6 +383,7 @@ backend/src/
 | SAME_DAY_CANCEL_LEAD_ONLY | 403 | 팀원의 당일 취소 시도 |
 | INVALID_STATUS_TRANSITION | 409 | 이미 처리된 신청 승인·반려·취소 |
 | INVALID_IP_FORMAT | 422 | IP 형식 오류 (연구실 IP, 재택·주말 근무 신청) |
+| OVER_LIMIT_REASON_REQUIRED | 422 | 재택 한도를 넘는 예외 신청에 사유가 없음 |
 | CANNOT_DELETE_CURRENT_IP | 409 | 현재 접속 중인 IP 삭제 시도 |
 | CANNOT_DELETE_LAST_IP | 409 | 마지막 남은 연구실 IP 삭제 시도 |
 | ON_ANNUAL_LEAVE | 409 | 승인된 연차일에 출근 시도 (출근이 필요하면 리드 당일 취소 → 긴급 출근) |

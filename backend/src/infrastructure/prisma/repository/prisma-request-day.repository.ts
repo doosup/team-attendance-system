@@ -43,4 +43,17 @@ export class PrismaRequestDayRepository extends RequestDayRepository {
     const overLimit = rows.filter((r) => r.request.isOverLimit).length;
     return { normal: rows.length - overLimit, overLimit };
   }
+
+  async findLiveDates(userId: number, dates: string[]) {
+    const rows = await this.tx.requestDay.findMany({
+      where: {
+        userId,
+        date: { in: dates },
+        status: 'ACTIVE',
+        request: { status: { in: ['PENDING', 'APPROVED'] } },
+      },
+      select: { date: true },
+    });
+    return rows.map((r) => r.date);
+  }
 }
