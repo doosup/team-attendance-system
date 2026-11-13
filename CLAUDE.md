@@ -36,7 +36,7 @@ domain/                      Domain 계층 — Nest·Prisma import 금지
   repository/                *.repository.ts  ← abstract class (인터페이스만)
   policy/                    attendance.policy.ts, request.policy.ts, balance.policy.ts (순수 함수)
   port/                      clock.port.ts
-  value/                     work-date.ts, half-days.ts, paging.ts
+  value/                     work-date.ts, business-day.ts, holidays.ts (영업일 판정은 정책이 쓰므로 domain)
   exception/                 custom.exception.ts, error-code.ts, <domain>.exception.ts
 infrastructure/
   prisma/                    prisma.service.ts, prisma.module.ts, repository.module.ts
@@ -47,7 +47,7 @@ infrastructure/
   token/                     jwt-token.service.ts
 common/
   decorators/ filters/(→ { error }) guards/(ip, jwt-auth, roles) interceptors/(→ { data }) pipes/
-  utils/                     ip.util.ts, business-day.util.ts, holidays/2026.json
+  utils/                     ip.util.ts
 config/
 ```
 - 파일명 = 기능명(kebab-case) + 역할 접미사. 예: `approve-request.controller.ts` / `.dto.ts` / `.use-case.ts`
@@ -98,7 +98,7 @@ config/
 - 기간 신청: 연차·재택은 startDate~endDate로 한 번에 신청·승인. 영업일만 차감. 반일 OFF·주말 근무는 하루만
 - 신청 기한: **시작일**의 직전 영업일 17:00:00까지 (17:00:01부터 거부)
 - 취소: 본인은 **기간 전체만**, 시작일의 직전 영업일 17:00:00까지 (`SELF_BEFORE_DEADLINE`). 기간 변경은 전체 취소 후 재신청. 당일(23:59:59까지)은 **리드만**, **그날 하루만**, 사유 필수 (`LEAD_SAME_DAY`) → 그날 `EMERGENCY_WORK`(지각·조퇴 판정 없음, 근무시간만 기록). 취소된 날짜만 원장 RESTORE (원래 만료일 유지). 지난 날짜 취소 불가
-- 영업일: 월~금 중 공휴일 제외. 공휴일은 `holidays/2026.json`
+- 영업일: 월~금 중 공휴일 제외. 공휴일은 `domain/value/holidays.ts`
 - 접속: 연구실 IP(AllowedIp, 시드 127.0.0.1) 상시 허용. 재택·주말/공휴일 근무는 승인된 신청의 IP·시간대에서만. 차단 시 403 `IP_NOT_ALLOWED` → 화면 "등록된 IP가 아닙니다 (현재 IP: x.x.x.x)"
 - IP: `net.isIP()`로 최소 형식 검사(연구실 IP·재택/주말 신청 IP 공통). `::ffff:` 접두어 제거, `::1`은 localhost로 정규화(평가자 환경 차단 방지). 연구실 IP는 리드 전용 API로 관리, 현재 접속 IP·마지막 IP 삭제 불가. CIDR 미지원
 - 로그인: JWT 12시간, localStorage. 401이면 로그인 화면. 비밀번호 재설정은 미구현(확장 방안)

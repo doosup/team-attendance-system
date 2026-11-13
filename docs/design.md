@@ -167,7 +167,7 @@ erDiagram
 - 재택·주말 근무 IP는 날짜·시간대에 묶여 있어 Request에
 
 ### 테이블로 만들지 않은 것
-- 공휴일: `holidays/2026.json` (결정 4)
+- 공휴일: `domain/value/holidays.ts` (결정 4). 신청 기한·주말 근무 판정을 하는 정책이 쓰므로 domain에 둔다
 - 재택 잔여 횟수: 이번 달 살아 있는 REMOTE RequestDay 수로 계산 (따로 저장하면 숫자가 어긋날 위험)
 - 현재 시각 변경값: 서버 메모리 (재시작 시 원래 시각으로)
 
@@ -246,7 +246,7 @@ backend/src/
 │   ├── repository/       *.repository.ts  ← abstract class (인터페이스)
 │   ├── policy/           attendance.policy.ts, request.policy.ts, balance.policy.ts  ← 순수 함수
 │   ├── port/             clock.port.ts
-│   ├── value/            work-date.ts, half-days.ts, paging.ts
+│   ├── value/            work-date.ts (KST 날짜), business-day.ts, holidays.ts
 │   └── exception/        custom.exception.ts, error-code.ts, attendance.exception.ts, request.exception.ts …
 ├── infrastructure/                      Infrastructure 계층
 │   ├── prisma/
@@ -263,7 +263,7 @@ backend/src/
 │   ├── guards/           ip.guard.ts, jwt-auth.guard.ts, roles.guard.ts
 │   ├── interceptors/     response.interceptor.ts  → { data }
 │   ├── pipes/            validation
-│   └── utils/            ip.util.ts, business-day.util.ts, holidays/2026.json
+│   └── utils/            ip.util.ts
 └── config/
 ```
 
@@ -379,6 +379,8 @@ backend/src/
 | INVALID_IP_FORMAT | 422 | IP 형식 오류 (연구실 IP, 재택·주말 근무 신청) |
 | CANNOT_DELETE_CURRENT_IP | 409 | 현재 접속 중인 IP 삭제 시도 |
 | CANNOT_DELETE_LAST_IP | 409 | 마지막 남은 연구실 IP 삭제 시도 |
+| ON_ANNUAL_LEAVE | 409 | 승인된 연차일에 출근 시도 (출근이 필요하면 리드 당일 취소 → 긴급 출근) |
+| WEEKEND_WORK_NOT_APPROVED | 403 | 승인된 주말·공휴일 근무 신청 없이 주말·공휴일 출근 (FR-ATT-04) |
 | VALIDATION_FAILED | 400 | 입력 형식 오류 (DTO 검증) |
 
 재택 한도 초과는 에러가 아니라 예외 신청(`isOverLimit: true`)으로 접수된다.
