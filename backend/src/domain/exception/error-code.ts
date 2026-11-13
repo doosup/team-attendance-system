@@ -29,6 +29,7 @@ export const ERROR_MESSAGES = {
   INVALID_IP_FORMAT: 'IP 형식이 올바르지 않습니다',
   OVER_LIMIT_REASON_REQUIRED:
     '재택 한도(월 2회)를 넘는 예외 신청은 사유가 필요합니다',
+  IP_NOT_ALLOWED: '등록된 IP가 아닙니다',
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

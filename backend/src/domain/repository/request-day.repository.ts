@@ -24,4 +24,9 @@ export abstract class RequestDayRepository {
   ): Promise<{ normal: number; overLimit: number }>;
   // dates 중 이미 살아 있는(대기·승인, ACTIVE) 신청이 있는 날짜 — 중복 신청 확인
   abstract findLiveDates(userId: number, dates: string[]): Promise<string[]>;
+  // date에 승인(APPROVED)·ACTIVE인 재택·주말 근무 중 신청 IP가 ip인 것의 신청자와 시간대
+  abstract findApprovedWindows(
+    date: string,
+    ip: string,
+  ): Promise<{ userId: number; startTime: string; endTime: string }[]>;
 }
