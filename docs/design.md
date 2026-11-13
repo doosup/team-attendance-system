@@ -398,6 +398,8 @@ backend/src/
 | OVER_LIMIT_REASON_REQUIRED | 422 | 재택 한도를 넘는 예외 신청에 사유가 없음 |
 | CANNOT_DELETE_CURRENT_IP | 409 | 현재 접속 중인 IP 삭제 시도 |
 | CANNOT_DELETE_LAST_IP | 409 | 마지막 남은 연구실 IP 삭제 시도 |
+| DUPLICATE_ALLOWED_IP | 409 | 살아 있는 연구실 IP와 같은 IP 추가 (정규화 후 비교) |
+| ALLOWED_IP_NOT_FOUND | 404 | 없거나 이미 삭제된 연구실 IP 삭제 |
 | ON_ANNUAL_LEAVE | 409 | 승인된 연차일에 출근 시도 (출근이 필요하면 리드 당일 취소 → 긴급 출근) |
 | WEEKEND_WORK_NOT_APPROVED | 403 | 승인된 주말·공휴일 근무 신청 없이 주말·공휴일 출근 (FR-ATT-04) |
 | USER_NOT_FOUND | 404 | 리드가 없는(또는 퇴사한) 사용자의 원장 조회 |
