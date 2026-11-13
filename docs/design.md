@@ -390,7 +390,8 @@ backend/src/
 | INSUFFICIENT_BALANCE | 422 | 연차·OFF 잔여 부족 |
 | WEEKEND_WORK_NOT_HOLIDAY | 422 | 영업일에 주말·공휴일 근무 신청 |
 | OVERLAPPING_REQUEST | 409 | 이미 신청이 있는 날짜와 겹침 |
-| SAME_DAY_CANCEL_LEAD_ONLY | 403 | 팀원의 당일 취소 시도 |
+| SAME_DAY_CANCEL_LEAD_ONLY | 403 | 팀원이 기한 지난 뒤 진행 중인(오늘이 기간 안) 신청을 취소하려 함 → 리드 당일 취소 안내 |
+| NOT_SAME_DAY | 422 | 리드 당일 취소에 오늘이 아닌 날짜 |
 | INVALID_STATUS_TRANSITION | 409 | 이미 처리된 신청 승인·반려·취소 |
 | REQUEST_NOT_FOUND | 404 | 없는 신청을 승인·반려·취소 |
 | INVALID_IP_FORMAT | 422 | IP 형식 오류 (연구실 IP, 재택·주말 근무 신청) |

@@ -32,6 +32,8 @@ export const ERROR_MESSAGES = {
   IP_NOT_ALLOWED: '등록된 IP가 아닙니다',
   INVALID_STATUS_TRANSITION: '이미 처리된 신청입니다',
   REQUEST_NOT_FOUND: '신청을 찾을 수 없습니다',
+  SAME_DAY_CANCEL_LEAD_ONLY: '진행 중인 신청은 리드만 당일 취소할 수 있습니다',
+  NOT_SAME_DAY: '당일 취소는 오늘 날짜만 할 수 있습니다',
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

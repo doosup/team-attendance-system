@@ -98,6 +98,44 @@ export class Request {
     });
   }
 
+  /** 본인 취소: 기간 전체 (기한 검사는 유스케이스). 취소한 날짜 행 id를 돌려준다 */
+  cancelBySelf(userId: number, now: Date): number[] {
+    if (this.props.status !== 'PENDING' && this.props.status !== 'APPROVED') {
+      throw new CustomException('INVALID_STATUS_TRANSITION');
+    }
+    this.props.status = 'CANCELED';
+    const canceled = this.props.days.filter((d) => d.status === 'ACTIVE');
+    for (const d of canceled) {
+      Object.assign(d, {
+        status: 'CANCELED',
+        cancelType: 'SELF_BEFORE_DEADLINE',
+        canceledById: userId,
+        canceledAt: now,
+      });
+    }
+    return canceled.flatMap((d) => (d.id === null ? [] : [d.id]));
+  }
+
+  /** 리드 당일 취소: 승인된 신청의 그날 하루만, 신청서는 승인 유지 (결정 12) */
+  cancelDay(date: string, leadId: number, reason: string, now: Date): number {
+    if (this.props.status !== 'APPROVED') {
+      throw new CustomException('INVALID_STATUS_TRANSITION');
+    }
+    const day = this.props.days.find((d) => d.date === date);
+    if (!day || day.id === null) throw new CustomException('REQUEST_NOT_FOUND');
+    if (day.status !== 'ACTIVE') {
+      throw new CustomException('INVALID_STATUS_TRANSITION');
+    }
+    Object.assign(day, {
+      status: 'CANCELED',
+      cancelType: 'LEAD_SAME_DAY',
+      canceledById: leadId,
+      canceledAt: now,
+      cancelReason: reason,
+    });
+    return day.id;
+  }
+
   get dayIds(): number[] {
     return this.props.days.flatMap((d) => (d.id === null ? [] : [d.id]));
   }
