@@ -1,0 +1,228 @@
+// 기준: docs/design.md ERD·테이블 설명·인덱스. 날짜는 'YYYY-MM-DD'(KST) 문자열, 순간은 UTC DateTime.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  // 평가자가 .env 없이 바로 실행하도록 고정. 테스트 DB는 PrismaClient의 datasourceUrl로 덮어쓴다.
+  url      = "file:./dev.db"
+}
+
+enum Role {
+  MEMBER
+  LEAD
+}
+
+enum DayType {
+  FULL_DAY
+  HALF_DAY_OFF
+  EMERGENCY_WORK
+  WEEKEND_WORK
+}
+
+enum CheckOutSource {
+  BUTTON
+  MANUAL
+}
+
+enum RequestType {
+  ANNUAL
+  REMOTE
+  HALF_OFF
+  WEEKEND_WORK
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum DayStatus {
+  ACTIVE
+  CANCELED
+}
+
+enum CancelType {
+  SELF_BEFORE_DEADLINE
+  LEAD_SAME_DAY
+}
+
+enum LeaveKind {
+  ANNUAL
+  HALF_OFF
+}
+
+enum LedgerEvent {
+  ACCRUE
+  USE
+  EXPIRE
+  RESTORE
+}
+
+enum AuditAction {
+  CHECK_IN
+  CHECK_OUT
+  MANUAL_CHECK_OUT
+  REQUEST_CREATE
+  REQUEST_CANCEL
+  REQUEST_DAY_CANCEL
+  REQUEST_APPROVE
+  REQUEST_REJECT
+  LOGIN
+  LOGIN_FAIL
+  IP_BLOCKED
+  ALLOWED_IP_ADD
+  ALLOWED_IP_DELETE
+  CLOCK_CHANGE
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  loginId      String    @unique
+  passwordHash String
+  name         String
+  role         Role
+  joinDate     String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  attendances       Attendance[]
+  requests          Request[]     @relation("RequestOwner")
+  decidedRequests   Request[]     @relation("RequestDecider")
+  requestDays       RequestDay[]  @relation("RequestDayOwner")
+  canceledDays      RequestDay[]  @relation("RequestDayCanceler")
+  ledgerEntries     LeaveLedger[]
+  auditLogs         AuditLog[]
+  createdAllowedIps AllowedIp[]
+}
+
+model Attendance {
+  id             Int             @id @default(autoincrement())
+  userId         Int
+  workDate       String
+  dayType        DayType
+  checkInAt      DateTime
+  checkOutAt     DateTime?
+  checkOutSource CheckOutSource?
+  isLate         Boolean
+  isEarlyLeave   Boolean?
+  workedMinutes  Int?
+  requestDayId   Int?            @unique
+  checkInIp      String
+  checkOutIp     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id])
+  requestDay RequestDay? @relation(fields: [requestDayId], references: [id])
+
+  @@unique([userId, workDate])
+  @@index([workDate])
+}
+
+model Request {
+  id           Int           @id @default(autoincrement())
+  userId       Int
+  type         RequestType
+  startDate    String
+  endDate      String
+  status       RequestStatus
+  isOverLimit  Boolean
+  reason       String
+  ip           String?
+  startTime    String?
+  endTime      String?
+  decidedById  Int?
+  decidedAt    DateTime?
+  rejectReason String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  user      User         @relation("RequestOwner", fields: [userId], references: [id])
+  decidedBy User?        @relation("RequestDecider", fields: [decidedById], references: [id])
+  days      RequestDay[]
+
+  @@index([userId, status])
+  @@index([status, startDate])
+}
+
+model RequestDay {
+  id           Int         @id @default(autoincrement())
+  requestId    Int
+  userId       Int
+  date         String
+  status       DayStatus
+  cancelType   CancelType?
+  canceledById Int?
+  canceledAt   DateTime?
+  cancelReason String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  request       Request       @relation(fields: [requestId], references: [id])
+  user          User          @relation("RequestDayOwner", fields: [userId], references: [id])
+  canceledBy    User?         @relation("RequestDayCanceler", fields: [canceledById], references: [id])
+  attendance    Attendance?
+  ledgerEntries LeaveLedger[]
+
+  @@index([userId, date, status])
+  @@index([date, status])
+}
+
+// 추가 전용: updatedAt 없음, 수정·삭제하지 않는다.
+model LeaveLedger {
+  id            Int         @id @default(autoincrement())
+  userId        Int
+  kind          LeaveKind
+  event         LedgerEvent
+  halfDays      Int
+  effectiveDate String
+  expiresOn     String?
+  grantId       Int?
+  requestDayId  Int?
+  dedupKey      String?     @unique
+  createdAt     DateTime    @default(now())
+
+  user       User          @relation(fields: [userId], references: [id])
+  grant      LeaveLedger?  @relation("OffGrant", fields: [grantId], references: [id])
+  usages     LeaveLedger[] @relation("OffGrant")
+  requestDay RequestDay?   @relation(fields: [requestDayId], references: [id])
+
+  @@index([userId, kind])
+}
+
+// 추가 전용. targetType+targetId는 여러 테이블을 가리켜 FK 없음.
+model AuditLog {
+  id         Int         @id @default(autoincrement())
+  actorId    Int?
+  action     AuditAction
+  targetType String?
+  targetId   Int?
+  payload    Json
+  ip         String
+  occurredAt DateTime
+  createdAt  DateTime    @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([actorId, occurredAt])
+  @@index([occurredAt])
+}
+
+// ip 유일 제약 없음: 소프트 삭제 후 재추가 허용, 살아 있는 것 중 중복은 유스케이스에서 확인.
+model AllowedIp {
+  id          Int       @id @default(autoincrement())
+  ip          String
+  label       String
+  createdById Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  createdBy User? @relation(fields: [createdById], references: [id])
+}
