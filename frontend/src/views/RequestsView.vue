@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, download } from '@/api/client';
 import type { LeaveRequest, RequestType } from '@/api/types';
 import { REQUEST_STATUS, REQUEST_TYPE } from '@/format';
 import { useClockStore } from '@/stores/clock';
@@ -73,6 +73,15 @@ async function cancel(r: LeaveRequest) {
     await load();
   } catch (e) {
     error.value = e instanceof ApiError ? e.message : '취소하지 못했습니다';
+  }
+}
+
+async function pdf(r: LeaveRequest) {
+  error.value = '';
+  try {
+    await download(`/requests/${r.id}/pdf`, `신청서-${r.id}.pdf`);
+  } catch (e) {
+    error.value = e instanceof ApiError ? e.message : 'PDF를 받지 못했습니다';
   }
 }
 </script>
@@ -172,7 +181,7 @@ async function cancel(r: LeaveRequest) {
               </span>
             </div>
           </td>
-          <td>
+          <td class="row">
             <button
               v-if="r.status === 'PENDING' || r.status === 'APPROVED'"
               class="danger"
@@ -180,6 +189,7 @@ async function cancel(r: LeaveRequest) {
             >
               취소
             </button>
+            <button @click="pdf(r)">PDF</button>
           </td>
         </tr>
       </tbody>

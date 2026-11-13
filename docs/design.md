@@ -236,7 +236,7 @@ backend/src/
 │   │   ├── dto/          check-in.dto.ts, manual-check-out.dto.ts, get-today.dto.ts …
 │   │   ├── use-case/     check-in.use-case.ts …
 │   │   └── attendance.module.ts
-│   ├── request/          create-request, get-my-requests, cancel-request
+│   ├── request/          create-request, get-my-requests, cancel-request, get-request-pdf (선택)
 │   ├── balance/          get-my-balance, get-my-ledger
 │   ├── dashboard/        get-team-board, get-my-missing-checkouts
 │   ├── dev/              get-clock, set-clock, reset-clock (개발 모드에서만 모듈 등록)
@@ -251,7 +251,7 @@ backend/src/
 │   ├── entity/           user, attendance, request, request-day, ledger-entry, allowed-ip, audit-log (.entity.ts)
 │   ├── repository/       *.repository.ts  ← abstract class (인터페이스)
 │   ├── policy/           attendance.policy.ts, request.policy.ts, balance.policy.ts  ← 순수 함수
-│   ├── port/             clock.port.ts
+│   ├── port/             clock.port.ts, request-pdf.port.ts
 │   ├── value/            work-date.ts (KST 날짜), business-day.ts, holidays.ts
 │   └── exception/        custom.exception.ts, error-code.ts, attendance.exception.ts, request.exception.ts …
 ├── infrastructure/                      Infrastructure 계층
@@ -261,7 +261,8 @@ backend/src/
 │   │   ├── mapper/       attendance.mapper.ts …  (Prisma 모델 ↔ 엔티티)
 │   │   └── repository.module.ts  (인터페이스 ↔ 구현 연결)
 │   ├── clock/            system.clock.ts, overridable.clock.ts  (clock.port 구현)
-│   └── token/            jwt-token.service.ts
+│   ├── token/            jwt-token.service.ts
+│   └── pdf/              pdfkit-request-pdf.renderer.ts  (request-pdf.port 구현, 나눔고딕은 backend/assets/fonts)
 ├── common/
 │   ├── decorators/       current-user, roles
 │   ├── filters/          domain-exception.filter.ts  → { error: { code, message } }
@@ -327,6 +328,7 @@ backend/src/
 | 신청 | POST | /requests | 신청 `{ type, startDate, endDate, reason, ip?, startTime?, endTime? }`. 반일 OFF·주말 근무는 startDate = endDate. 재택 한도 초과면 `isOverLimit: true`로 접수 | 로그인 | FR-REQ-01 |
 | 신청 | GET | /requests/me | 내 신청 목록 (날짜별 상태 포함) | 로그인 | FR-REQ-01 |
 | 신청 | POST | /requests/:id/cancel | 본인 전체 취소 (시작일의 직전 영업일 17:00:00까지) | 본인 | FR-REQ-01 |
+| 신청 | GET | /requests/:id/pdf | 신청서 PDF 내려받기 (선택). `application/pdf` 파일 자체로 응답 (`{ data }` 감싸지 않음) | 본인·리드 | FR-REQ-03 |
 | 잔여 | GET | /balances/me | 연차·OFF(만료일 포함) 잔여, 이번 달 재택 `used/2 + 예외 n회` | 로그인 | FR-BAL-01 |
 | 잔여 | GET | /balances/me/ledger | 내 원장 내역 | 로그인 | FR-BAL-01 |
 | 대시보드 | GET | /dashboard/team?date= | 팀원별 그날 상태. 팀원은 상태만, 리드는 시각·지각·조퇴·10시 경과 미출근 포함 | 로그인 | FR-DSH-01 |
@@ -366,6 +368,14 @@ backend/src/
 - 상태: WORKING(출근) / LEFT(퇴근) / REMOTE(재택 근무 중) / ANNUAL(연차) / HALF_OFF(반일 OFF, 출근 전) / PENDING_APPROVAL(승인 대기) / NOT_CHECKED_IN(미출근) / DAY_OFF(주말·공휴일)
 - 판정은 `domain/policy/board.policy.ts` 순수 함수. 저장소의 날짜별 조회(출퇴근·신청 날짜)를 모아 넘긴다 → query 계층 없이도 테스트 가능해 팀 보드는 저장소를 쓴다
 - 팀원 응답은 `{ userId, name, status }`만, 리드는 근무 유형·출퇴근 시각·지각·조퇴·근무시간·직접 입력 여부·`pastTen`(10:00 지나도 미출근)까지
+
+**신청서 PDF (`GET /requests/:id/pdf`)**
+- 권한: 본인 신청은 본인, 모든 신청은 리드. 팀원이 남의 신청을 요청하면 **없는 신청과 같은 404 `REQUEST_NOT_FOUND`** (본인 취소와 같은 규칙, 존재 여부를 드러내지 않음). 화면도 내 신청 목록·리드 신청 목록에만 버튼을 둔다
+- 상태와 상관없이 발급한다 (대기·승인·반려·취소). 상태·날짜별 취소·결재란에 그대로 보여 준다
+- 양식: 제목(종류) → 신청 정보 표(신청자·종류·기간·적용 날짜·IP·시간대·사유·상태·반려 사유) → 리드 결재란 → 발급 시각(Clock, KST)
+- 렌더링은 `domain/port/request-pdf.port.ts`(포트) ↔ `infrastructure/pdf`(pdfkit 구현). 유스케이스는 이름을 채운 `RequestDocument`만 넘긴다 → 라이브러리를 바꿔도 app은 그대로
+- 한글은 PDF 기본 글꼴에 없어 나눔고딕(OFL)을 넣는다. 서버에서 만드는 이유: 브라우저 인쇄는 양식이 브라우저마다 달라지고, 서버 시각으로 발급 시각을 찍어야 해서
+- 내려받기는 조회라 이력을 남기지 않는다 (결정 A14)
 
 **월별 정산 (`GET /lead/settlements?month=`)**
 - 응답: `{ month, asOf, rows: [{ userId, name, workDays, workedMinutes, lateCount, earlyLeaveCount, manualCount, missingCount, annualUsedDays, halfOffUsed, remote: { used, exceptions }, annualBalanceDays, halfOffBalance }] }`

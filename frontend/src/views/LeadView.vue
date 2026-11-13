@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, download } from '@/api/client';
 import type {
   AllowedIp,
   AuditLog,
@@ -100,6 +100,9 @@ const deleteIp = (ip: AllowedIp) =>
     await load();
   });
 
+const pdf = (r: LeaveRequest) =>
+  guard(() => download(`/requests/${r.id}/pdf`, `신청서-${r.id}.pdf`));
+
 const period = (r: LeaveRequest) =>
   r.endDate === r.startDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`;
 </script>
@@ -130,6 +133,7 @@ const period = (r: LeaveRequest) =>
           <td class="row">
             <button class="primary" @click="approve(r)">승인</button>
             <button class="danger" @click="reject(r)">반려</button>
+            <button @click="pdf(r)">PDF</button>
           </td>
         </tr>
       </tbody>
@@ -147,10 +151,11 @@ const period = (r: LeaveRequest) =>
           <td>{{ r.userName }}</td>
           <td>{{ REQUEST_TYPE[r.type] }}</td>
           <td>{{ period(r) }}</td>
-          <td>
+          <td class="row">
             <button class="danger" @click="cancelToday(r)">
               오늘만 취소 (긴급 출근)
             </button>
+            <button @click="pdf(r)">PDF</button>
           </td>
         </tr>
       </tbody>
