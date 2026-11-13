@@ -18,6 +18,17 @@ export const ERROR_MESSAGES = {
     '퇴근 시각은 그날 출근 시각 이후부터 23:59:59까지 입력할 수 있습니다',
   MANUAL_CHECKOUT_NOT_PENDING: '직접 입력할 미기록 퇴근 건이 아닙니다',
   USER_NOT_FOUND: '사용자를 찾을 수 없습니다',
+  INVALID_DATE_RANGE:
+    '신청 기간이 올바르지 않습니다 (종료일·하루만 가능한 종류·지원 연도 2026)',
+  NO_BUSINESS_DAY_IN_RANGE: '신청 기간에 영업일이 없습니다',
+  WEEKEND_WORK_NOT_HOLIDAY:
+    '주말·공휴일 근무는 주말·공휴일에만 신청할 수 있습니다',
+  REQUEST_DEADLINE_PASSED: '신청 기한(시작일의 직전 영업일 17:00)이 지났습니다',
+  INSUFFICIENT_BALANCE: '잔여가 부족합니다',
+  OVERLAPPING_REQUEST: '이미 신청이 있는 날짜와 겹칩니다',
+  INVALID_IP_FORMAT: 'IP 형식이 올바르지 않습니다',
+  OVER_LIMIT_REASON_REQUIRED:
+    '재택 한도(월 2회)를 넘는 예외 신청은 사유가 필요합니다',
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

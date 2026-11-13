@@ -22,4 +22,6 @@ export abstract class RequestDayRepository {
     userId: number,
     month: string,
   ): Promise<{ normal: number; overLimit: number }>;
+  // dates 중 이미 살아 있는(대기·승인, ACTIVE) 신청이 있는 날짜 — 중복 신청 확인
+  abstract findLiveDates(userId: number, dates: string[]): Promise<string[]>;
 }
