@@ -298,6 +298,11 @@ backend/src/
 
 통합 테스트 핵심 흐름: 출근 → 퇴근 → 판정 / 신청 → 승인 → 원장 차감 → 취소 → 복원 / 허용되지 않은 IP는 403 / 미기록 퇴근이 남으면 퇴근 거부
 
+- 실행: `npm run test`(단위·유스케이스), `npm run test:e2e`(통합, `test/app.e2e-spec.ts`)
+- e2e는 `DATABASE_URL=file:./e2e.db`로 매번 새 DB에 마이그레이션 후 AppModule 전체(가드·트랜잭션·Prisma)를 띄워 HTTP로 호출. `main.ts`와 같은 설정(`configure-app.ts`)을 쓴다
+- 유스케이스 테스트는 `test/fakes/`의 메모리 저장소·고정 시계를 쓰고, `@Transactional()`은 `test/setup-unit.ts`에서 통과시킨다 (실제 트랜잭션은 e2e·수동 롤백 확인으로)
+- DB 경로는 `DATABASE_URL`(setup이 `backend/.env`에 `file:./dev.db`로 생성)
+
 경계값 테스트 필수: 06:59:59/07:00:00, 10:00:00/10:00:01, 15:59:59/16:00:00, 17:00:00/17:00:01
 
 ## API 목록 (확정)

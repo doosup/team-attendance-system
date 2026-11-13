@@ -6,8 +6,8 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  // 평가자가 .env 없이 바로 실행하도록 고정. 테스트 DB는 PrismaClient의 datasourceUrl로 덮어쓴다.
-  url      = "file:./dev.db"
+  // npm run setup이 backend/.env에 DATABASE_URL="file:./dev.db"를 만든다. e2e는 file:./e2e.db
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
