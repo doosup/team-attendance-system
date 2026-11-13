@@ -10,6 +10,12 @@ export abstract class AttendanceRepository {
     userId: number,
     workDate: string,
   ): Promise<Attendance | null>;
+  // month = 'YYYY-MM', 날짜순
+  abstract findByUserAndMonth(
+    userId: number,
+    month: string,
+  ): Promise<Attendance[]>;
   // 같은 사람·같은 날이 이미 있으면 ALREADY_CHECKED_IN
   abstract create(attendance: Attendance): Promise<Attendance>;
+  abstract save(attendance: Attendance): Promise<void>;
 }
