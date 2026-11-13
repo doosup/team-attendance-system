@@ -34,6 +34,10 @@ export const ERROR_MESSAGES = {
   REQUEST_NOT_FOUND: '신청을 찾을 수 없습니다',
   SAME_DAY_CANCEL_LEAD_ONLY: '진행 중인 신청은 리드만 당일 취소할 수 있습니다',
   NOT_SAME_DAY: '당일 취소는 오늘 날짜만 할 수 있습니다',
+  DUPLICATE_ALLOWED_IP: '이미 등록된 연구실 IP입니다',
+  ALLOWED_IP_NOT_FOUND: '연구실 IP를 찾을 수 없습니다',
+  CANNOT_DELETE_CURRENT_IP: '지금 접속 중인 IP는 삭제할 수 없습니다',
+  CANNOT_DELETE_LAST_IP: '마지막 남은 연구실 IP는 삭제할 수 없습니다',
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;

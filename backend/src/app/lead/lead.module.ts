@@ -1,5 +1,11 @@
 import { Module } from '@nestjs/common';
 import { BalanceModule } from '../balance/balance.module';
+import { AddAllowedIpController } from './allowed-ip/controller/add-allowed-ip.controller';
+import { DeleteAllowedIpController } from './allowed-ip/controller/delete-allowed-ip.controller';
+import { GetAllowedIpsController } from './allowed-ip/controller/get-allowed-ips.controller';
+import { AddAllowedIpUseCase } from './allowed-ip/use-case/add-allowed-ip.use-case';
+import { DeleteAllowedIpUseCase } from './allowed-ip/use-case/delete-allowed-ip.use-case';
+import { GetAllowedIpsUseCase } from './allowed-ip/use-case/get-allowed-ips.use-case';
 import { ApproveRequestController } from './approval/controller/approve-request.controller';
 import { CancelRequestDayController } from './approval/controller/cancel-request-day.controller';
 import { GetPendingRequestsController } from './approval/controller/get-pending-requests.controller';
@@ -23,6 +29,9 @@ import { GetUserLedgerUseCase } from './balance/use-case/get-user-ledger.use-cas
     ApproveRequestController,
     RejectRequestController,
     CancelRequestDayController,
+    GetAllowedIpsController,
+    AddAllowedIpController,
+    DeleteAllowedIpController,
   ],
   providers: [
     GetUserLedgerUseCase,
@@ -31,6 +40,9 @@ import { GetUserLedgerUseCase } from './balance/use-case/get-user-ledger.use-cas
     ApproveRequestUseCase,
     RejectRequestUseCase,
     CancelRequestDayUseCase,
+    GetAllowedIpsUseCase,
+    AddAllowedIpUseCase,
+    DeleteAllowedIpUseCase,
   ],
 })
 export class LeadModule {}
