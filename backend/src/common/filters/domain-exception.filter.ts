@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { CustomException } from '../../domain/exception/custom.exception';
+import { ERROR_STATUS } from './error-status';
 
 // 모든 실패 응답을 { error: { code, message } }로 맞춘다.
 @Catch()
@@ -24,7 +25,8 @@ export class DomainExceptionFilter implements ExceptionFilter {
   }
 
   private toError(e: unknown): [number, string, string] {
-    if (e instanceof CustomException) return [e.status, e.code, e.message];
+    if (e instanceof CustomException)
+      return [ERROR_STATUS[e.code], e.code, e.message];
     if (e instanceof HttpException) {
       const status = e.getStatus();
       return [status, HttpStatus[status] ?? 'HTTP_ERROR', e.message];
