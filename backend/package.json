@@ -19,11 +19,12 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "setup": "prisma generate && prisma migrate deploy && prisma db seed"
+    "setup": "node scripts/ensure-env.js && prisma generate && prisma migrate deploy && prisma db seed"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
+    "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "^11.0.1",
     "@prisma/client": "^6.19.3",
     "bcrypt": "^6.0.0",
