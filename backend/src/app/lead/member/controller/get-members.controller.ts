@@ -1,6 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { Roles } from '../../../../common/decorators/roles.decorator';
-import { MemberResult } from '../dto/get-members.dto';
+import { GetMembersQuery, MemberResult } from '../dto/get-members.dto';
 import { GetMembersUseCase } from '../use-case/get-members.use-case';
 
 @Roles('LEAD')
@@ -9,7 +9,7 @@ export class GetMembersController {
   constructor(private readonly useCase: GetMembersUseCase) {}
 
   @Get()
-  list(): Promise<MemberResult[]> {
-    return this.useCase.execute();
+  list(@Query() query: GetMembersQuery): Promise<MemberResult[]> {
+    return this.useCase.execute(query);
   }
 }

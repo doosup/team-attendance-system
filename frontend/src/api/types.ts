@@ -114,6 +114,7 @@ export interface Member {
   name: string;
   role: Role;
   joinDate: string;
+  retiredDate: string | null; // GET /lead/users?includeRetired=true 일 때만 값이 있을 수 있음
 }
 
 export interface AllowedIp {
@@ -122,6 +123,25 @@ export interface AllowedIp {
   label: string;
   createdAt: string;
 }
+
+// 백엔드 AuditAction과 같은 목록 (ACTION_LABEL이 빠짐없이 한글 이름을 갖게)
+export type AuditAction =
+  | 'CHECK_IN'
+  | 'CHECK_OUT'
+  | 'MANUAL_CHECK_OUT'
+  | 'REQUEST_CREATE'
+  | 'REQUEST_CANCEL'
+  | 'REQUEST_DAY_CANCEL'
+  | 'REQUEST_APPROVE'
+  | 'REQUEST_REJECT'
+  | 'LOGIN'
+  | 'LOGIN_FAIL'
+  | 'IP_BLOCKED'
+  | 'ALLOWED_IP_ADD'
+  | 'ALLOWED_IP_DELETE'
+  | 'CLOCK_CHANGE'
+  | 'USER_CREATE'
+  | 'USER_RETIRE';
 
 export interface AuditLog {
   id: number;

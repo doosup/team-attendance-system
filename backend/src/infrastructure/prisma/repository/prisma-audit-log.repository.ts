@@ -32,6 +32,7 @@ export class PrismaAuditLogRepository extends AuditLogRepository {
       where: {
         actorId: f.actorId,
         occurredAt: { gte: f.from, lt: f.to },
+        action: f.excludeActions && { notIn: f.excludeActions },
       },
       include: { actor: { select: { name: true } } },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],

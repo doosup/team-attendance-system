@@ -168,7 +168,8 @@ erDiagram
 - 시각 두 개: `occurredAt`(Clock 기준 업무 시각), `createdAt`(실제 기록 시각) → 시각을 바꿔 테스트한 기록인지 구분
 - 기록하는 행동: CHECK_IN·CHECK_OUT·MANUAL_CHECK_OUT(근무시간·조퇴·OFF 지급), REQUEST_CREATE(자동 승인·예외 표시), LOGIN, LOGIN_FAIL(아이디만, 비밀번호 없음), IP_BLOCKED(메서드·경로), CLOCK_CHANGE(from·to), 승인·반려·취소·IP 관리. **조회는 기록하지 않는다**
 - 변경 이력은 그 변경과 **같은 트랜잭션**에 쓴다(변경이 롤백되면 이력도 없음). 거부 자체가 사건인 LOGIN_FAIL·IP_BLOCKED는 트랜잭션 밖에서 먼저 쓰고 거부한다
-- 조회 `GET /lead/audit-logs?userId=&from=&to=`: from·to는 KST 날짜(끝 날짜 포함), occurredAt 최신순 200건
+- 조회 `GET /lead/audit-logs?userId=&from=&to=&includeLogin=`: from·to는 KST 날짜(끝 날짜 포함), occurredAt 최신순 200건. 로그인 성공(LOGIN)은 **기록은 하되** 기본 조회에서 빼고 `includeLogin=true`일 때만 포함(주요 이력이 묻히지 않게, ATT-38). 로그인 실패·IP 차단은 보안상 항상 포함
+- 화면은 동작을 한글 이름으로, payload를 문장으로 보여 주고(예: "김근태님 연차 2026-11-17 ~ 2026-11-18 승인") 원본 JSON은 펼쳐 볼 수 있게 둔다
 
 ### AllowedIp
 - 연구실 IP 상시 허용 목록. 시드 `127.0.0.1`. 리드가 API로 관리
@@ -345,13 +346,13 @@ backend/src/
 | 리드 | POST | /lead/requests/:id/days/:date/cancel | 당일 취소 `{ cancelReason }` → 그날 긴급 출근 | 리드 | FR-REQ-01 |
 | 리드 | GET | /lead/missing-checkouts | 팀 전체 퇴근 미기록·직접 입력 건 | 리드 | FR-DSH-01 |
 | 리드 | GET | /lead/users/:userId/ledger | 팀원 원장 내역 | 리드 | FR-BAL-01 |
-| 리드 | GET | /lead/users | 재직 중인 사용자 목록 `[{ id, loginId, name, role, joinDate }]` (선택, ATT-32) | 리드 | FR-SYS-02 |
+| 리드 | GET | /lead/users?includeRetired= | 재직 중인 사용자 목록 `[{ id, loginId, name, role, joinDate, retiredDate }]` (선택, ATT-32). `includeRetired=true`면 퇴사자도(이력 필터·이름 표시용, ATT-38) | 리드 | FR-SYS-02 |
 | 리드 | POST | /lead/users | 팀원 등록 `{ loginId, password, name, joinDate }`, 역할은 팀원 고정 (결정 A19) | 리드 | FR-SYS-02 |
 | 리드 | DELETE | /lead/users/:id | 퇴사 처리 = 소프트 삭제 + 내일 이후 신청 날짜 자동 취소·원장 복원. 리드는 불가 (결정 A20) | 리드 | FR-SYS-02 |
 | 리드 | GET | /lead/allowed-ips | 연구실 IP 목록 | 리드 | FR-SYS-01 |
 | 리드 | POST | /lead/allowed-ips | 추가 `{ ip, label }` (형식 검사·정규화) | 리드 | FR-SYS-01 |
 | 리드 | DELETE | /lead/allowed-ips/:id | 소프트 삭제 (현재 접속 IP·마지막 IP 불가) | 리드 | FR-SYS-01 |
-| 리드 | GET | /lead/audit-logs?userId=&from=&to= | 인터랙션 이력 | 리드 | FR-LOG-01 |
+| 리드 | GET | /lead/audit-logs?userId=&from=&to=&includeLogin= | 인터랙션 이력 (로그인 성공은 includeLogin일 때만) | 리드 | FR-LOG-01 |
 | 리드 | GET | /lead/settlements?month= | 월별 정산 (선택). month 없으면 이번 달. 팀원별 근무일·근무시간·지각·조퇴·직접 입력·미기록·연차/OFF 사용·재택·잔여 | 리드 | FR-STL-01 |
 | 개발 | GET / PUT / DELETE | /dev/clock | 현재 시각 조회·변경·초기화 | 개발 모드 | 참고사항 |
 
