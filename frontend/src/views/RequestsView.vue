@@ -1,12 +1,28 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { api, ApiError, download } from '@/api/client';
-import type { LeaveRequest, RequestType } from '@/api/types';
+import type { Balance, LeaveRequest, RequestType } from '@/api/types';
 import { REQUEST_STATUS, REQUEST_TYPE } from '@/format';
 import { useClockStore } from '@/stores/clock';
 
-// 신청서 (FN-REQ-01): 종류·날짜·사유, 재택·주말 근무는 IP와 시간대도
+// 신청서 (FN-REQ-01). 쉬는 신청(휴가)과 일하는 방식 신청(근무)을 탭으로 나눈다 (ATT-33)
+// API는 하나(POST /requests)라 정산·원장·PDF는 그대로
+type Tab = 'LEAVE' | 'WORK';
+const TABS: { key: Tab; label: string; types: RequestType[] }[] = [
+  { key: 'LEAVE', label: '휴가 신청', types: ['ANNUAL', 'HALF_OFF'] },
+  { key: 'WORK', label: '근무 신청', types: ['REMOTE', 'WEEKEND_WORK'] },
+];
+const tabOf = (t: RequestType): Tab =>
+  t === 'ANNUAL' || t === 'HALF_OFF' ? 'LEAVE' : 'WORK';
+
 const clock = useClockStore();
+const tab = ref<Tab>('LEAVE');
+const tabTypes = computed(() => TABS.find((t) => t.key === tab.value)!.types);
+function selectTab(key: Tab) {
+  tab.value = key;
+  form.type = TABS.find((t) => t.key === key)!.types[0];
+  error.value = notice.value = '';
+}
 const form = reactive({
   type: 'ANNUAL' as RequestType,
   startDate: '',
@@ -23,15 +39,19 @@ const needsIp = computed(
   () => form.type === 'REMOTE' || form.type === 'WEEKEND_WORK',
 );
 const list = ref<LeaveRequest[]>([]);
+const balance = ref<Balance | null>(null);
 const includeCanceled = ref(false);
 const error = ref('');
 const notice = ref('');
 
 async function load() {
-  list.value = await api<LeaveRequest[]>(
-    'GET',
-    `/requests/me${includeCanceled.value ? '?includeCanceled=true' : ''}`,
-  );
+  [list.value, balance.value] = await Promise.all([
+    api<LeaveRequest[]>(
+      'GET',
+      `/requests/me${includeCanceled.value ? '?includeCanceled=true' : ''}`,
+    ),
+    api<Balance>('GET', '/balances/me'),
+  ]);
 }
 onMounted(load);
 watch([includeCanceled, () => clock.version], load);
@@ -88,13 +108,48 @@ async function pdf(r: LeaveRequest) {
 
 <template>
   <section class="card">
-    <h2>신청서</h2>
-    <form @submit.prevent="submit">
+    <div class="tabs" role="tablist" aria-label="신청 종류">
+      <button
+        v-for="t in TABS"
+        :id="`tab-${t.key}`"
+        :key="t.key"
+        type="button"
+        role="tab"
+        :aria-selected="tab === t.key"
+        aria-controls="request-form"
+        :class="{ active: tab === t.key }"
+        @click="selectTab(t.key)"
+      >
+        {{ t.label }}
+      </button>
+    </div>
+    <p v-if="balance" class="muted summary">
+      <template v-if="tab === 'LEAVE'">
+        연차 잔여 {{ balance.annual.days }}일 · 반일 OFF
+        {{ balance.halfOff.count }}개
+        <template v-if="balance.halfOff.grants[0]">
+          (가장 빠른 만료 {{ balance.halfOff.grants[0].expiresOn }})
+        </template>
+      </template>
+      <template v-else>
+        이번 달 재택 {{ balance.remote.used }}/{{ balance.remote.limit }}회
+        <template v-if="balance.remote.exceptions">
+          + 예외 {{ balance.remote.exceptions }}회
+        </template>
+        · 재택·주말 근무는 신청한 IP와 시간대에서만 출퇴근할 수 있습니다
+      </template>
+    </p>
+    <form
+      id="request-form"
+      role="tabpanel"
+      :aria-labelledby="`tab-${tab}`"
+      @submit.prevent="submit"
+    >
       <label>
         <span>종류</span>
         <select v-model="form.type">
-          <option v-for="(label, key) in REQUEST_TYPE" :key="key" :value="key">
-            {{ label }}
+          <option v-for="key in tabTypes" :key="key" :value="key">
+            {{ REQUEST_TYPE[key] }}
           </option>
         </select>
       </label>
@@ -123,7 +178,9 @@ async function pdf(r: LeaveRequest) {
         <input
           v-model="form.reason"
           size="40"
-          placeholder="재택 한도 초과 예외 신청은 필수"
+          :placeholder="
+            tab === 'WORK' ? '재택 한도 초과 예외 신청은 필수' : '선택'
+          "
         />
       </label>
       <p class="muted">기한: 시작일의 직전 영업일 17:00:00까지</p>
@@ -154,6 +211,9 @@ async function pdf(r: LeaveRequest) {
       <tbody>
         <tr v-for="r in list" :key="r.id">
           <td>
+            <span class="tag">{{
+              tabOf(r.type) === 'LEAVE' ? '휴가' : '근무'
+            }}</span>
             {{ REQUEST_TYPE[r.type] }}
             <span v-if="r.isOverLimit" class="tag warn">예외</span>
           </td>
@@ -196,3 +256,33 @@ async function pdf(r: LeaveRequest) {
     </table>
   </section>
 </template>
+
+<style scoped>
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #e3e6ea;
+  margin-bottom: 12px;
+}
+.tabs button {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  padding: 8px 14px;
+  font-size: 15px;
+  color: #57606a;
+}
+.tabs button.active {
+  border-bottom-color: #0b57d0;
+  color: #0b57d0;
+  font-weight: 600;
+}
+.tabs button:focus-visible {
+  outline: 2px solid #0b57d0;
+  outline-offset: -2px;
+}
+.summary {
+  margin: 0 0 12px;
+}
+</style>
