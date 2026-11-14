@@ -269,14 +269,13 @@ backend/src/
 │   ├── clock/            system.clock.ts, overridable.clock.ts  (clock.port 구현)
 │   ├── token/            jwt-token.service.ts
 │   └── pdf/              pdfkit-request-pdf.renderer.ts  (request-pdf.port 구현, 나눔고딕은 backend/assets/fonts)
-├── common/
-│   ├── decorators/       current-user, roles
-│   ├── filters/          domain-exception.filter.ts  → { error: { code, message } }
-│   ├── guards/           ip.guard.ts, jwt-auth.guard.ts, roles.guard.ts
-│   ├── interceptors/     response.interceptor.ts  → { data }
-│   ├── pipes/            validation
-│   └── utils/            ip.util.ts
-└── config/
+└── common/
+    ├── decorators/       current-user, roles
+    ├── filters/          domain-exception.filter.ts  → { error: { code, message } }
+    ├── guards/           ip.guard.ts, jwt-auth.guard.ts, roles.guard.ts
+    ├── interceptors/     response.interceptor.ts  → { data }
+    ├── pipes/            validation
+    └── utils/            ip.util.ts
 ```
 
 | 계층 | 디렉토리 | 하는 일 | 하지 않는 일 |
