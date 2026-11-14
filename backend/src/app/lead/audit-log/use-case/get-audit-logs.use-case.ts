@@ -14,11 +14,12 @@ export class GetAuditLogsUseCase implements UseCase<
 > {
   constructor(private readonly audit: AuditLogRepository) {}
 
-  async execute({ userId, from, to }: GetAuditLogsQuery) {
+  async execute({ userId, from, to, includeLogin }: GetAuditLogsQuery) {
     const rows = await this.audit.find({
       actorId: userId,
       from: from ? kstAt(from, '00:00:00') : undefined,
       to: to ? kstAt(addDays(to, 1), '00:00:00') : undefined,
+      excludeActions: includeLogin ? undefined : ['LOGIN'],
       limit: LIMIT,
     });
     return rows.map((r) => AuditLogResult.from(r));

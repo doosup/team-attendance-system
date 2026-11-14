@@ -132,6 +132,12 @@ describe('팀원 등록·퇴사 처리 (결정 A19·A20)', () => {
 
       expect(await users.findById(KIM.id)).toBeNull();
       expect((await list.execute()).map((m) => m.loginId)).toEqual(['lead']);
+      // 이력 필터·이름 표시용: 퇴사자 포함 조회 (ATT-38)
+      expect(
+        (await list.execute({ includeRetired: true })).find(
+          (m) => m.id === KIM.id,
+        ),
+      ).toMatchObject({ name: '김근태', retiredDate: '2026-11-11' });
       const kept = (await users.findAllIncludingRetired()).find(
         (u) => u.id === KIM.id,
       );

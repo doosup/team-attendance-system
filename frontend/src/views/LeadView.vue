@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { api, ApiError, download } from '@/api/client';
 import type {
   AllowedIp,
+  AuditAction,
   AuditLog,
   LeaveRequest,
   Member,
@@ -10,6 +11,7 @@ import type {
 } from '@/api/types';
 import { halfOffText, kstDateTime, kstTime, REQUEST_TYPE } from '@/format';
 import SettlementPanel from '@/components/SettlementPanel.vue';
+import { ACTION_LABEL, describeLog } from '@/audit-log';
 import { useClockStore } from '@/stores/clock';
 
 // 리드 전용: 승인·반려, 당일 취소, 팀 미기록, 월별 정산, 연구실 IP, 이력
@@ -19,6 +21,8 @@ const approved = ref<LeaveRequest[]>([]);
 const missing = ref<MissingCheckout[]>([]);
 const ips = ref<AllowedIp[]>([]);
 const members = ref<Member[]>([]);
+// 이력 필터·이름 표시용: 퇴사자 포함 (ATT-38)
+const everyone = ref<Member[]>([]);
 const newMember = reactive({
   loginId: '',
   password: '',
@@ -27,7 +31,12 @@ const newMember = reactive({
 });
 const logs = ref<AuditLog[]>([]);
 const newIp = reactive({ ip: '', label: '' });
-const logFilter = reactive({ userId: '', from: '', to: '' });
+const logFilter = reactive({
+  userId: '',
+  from: '',
+  to: '',
+  includeLogin: false,
+});
 const error = ref('');
 
 async function guard(action: () => Promise<unknown>) {
@@ -41,7 +50,9 @@ async function guard(action: () => Promise<unknown>) {
 
 async function loadLogs() {
   const q = new URLSearchParams(
-    Object.entries(logFilter).filter(([, v]) => v !== '') as [string, string][],
+    Object.entries(logFilter)
+      .filter(([, v]) => v !== '' && v !== false)
+      .map(([k, v]) => [k, String(v)]),
   );
   logs.value = await api<AuditLog[]>('GET', `/lead/audit-logs?${q}`);
 }
@@ -71,11 +82,20 @@ async function load() {
       fail,
     ),
     api<Member[]>('GET', '/lead/users').then((r) => (members.value = r), fail),
+    api<Member[]>('GET', '/lead/users?includeRetired=true').then(
+      (r) => (everyone.value = r),
+      fail,
+    ),
     loadLogs().catch(fail),
   ]);
 }
 onMounted(load);
 watch(() => clock.version, load);
+// 사람·로그인 포함을 바꾸면 바로 다시 조회 (기간은 두 칸을 고른 뒤 조회 버튼으로)
+watch(
+  () => [logFilter.userId, logFilter.includeLogin],
+  () => guard(loadLogs),
+);
 
 // 당일 취소 대상: 승인된 신청 중 오늘 날짜가 살아 있는 것 (결정 12)
 const todays = computed(() =>
@@ -152,6 +172,10 @@ const retireMember = (m: Member) =>
 
 const pdf = (r: LeaveRequest) =>
   guard(() => download(`/requests/${r.id}/pdf`, `신청서-${r.id}.pdf`));
+
+// 이력의 신청자 id → 이름. 퇴사자는 목록에 없어 #id로
+const nameOf = (id: unknown) =>
+  everyone.value.find((m) => m.id === id)?.name ?? `#${String(id)}`;
 
 const period = (r: LeaveRequest) =>
   r.endDate === r.startDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`;
@@ -341,11 +365,24 @@ const period = (r: LeaveRequest) =>
   <section class="card">
     <h2>인터랙션 이력</h2>
     <form class="row" @submit.prevent="guard(loadLogs)">
-      <input v-model="logFilter.userId" placeholder="사용자 id" size="8" />
+      <select v-model="logFilter.userId" aria-label="누가">
+        <option value="">전체</option>
+        <option v-for="m in everyone" :key="m.id" :value="String(m.id)">
+          {{ m.name }}{{ m.retiredDate ? ' (퇴사)' : '' }}
+        </option>
+      </select>
       <input v-model="logFilter.from" type="date" /> ~
       <input v-model="logFilter.to" type="date" />
+      <label
+        ><input v-model="logFilter.includeLogin" type="checkbox" /> 로그인
+        포함</label
+      >
       <button type="submit">조회</button>
     </form>
+    <p class="muted">
+      출퇴근·신청·승인 등 모든 인터랙션이 기록됩니다. 로그인 성공은 기본으로
+      숨기고, 로그인 실패·접속 차단은 보안상 항상 보여 줍니다.
+    </p>
     <table>
       <thead>
         <tr>
@@ -365,8 +402,14 @@ const period = (r: LeaveRequest) =>
             </div>
           </td>
           <td>{{ l.actor?.name ?? '-' }}</td>
-          <td>{{ l.action }}</td>
-          <td class="muted payload">{{ JSON.stringify(l.payload) }}</td>
+          <td>{{ ACTION_LABEL[l.action as AuditAction] ?? l.action }}</td>
+          <td>
+            {{ describeLog(l, nameOf) }}
+            <details class="muted payload">
+              <summary>원본</summary>
+              {{ JSON.stringify(l.payload) }}
+            </details>
+          </td>
           <td>{{ l.ip }}</td>
         </tr>
       </tbody>

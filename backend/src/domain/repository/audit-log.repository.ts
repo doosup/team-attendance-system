@@ -1,9 +1,14 @@
-import { AuditDraft, AuditLogView } from '../entity/audit-log.entity';
+import {
+  AuditAction,
+  AuditDraft,
+  AuditLogView,
+} from '../entity/audit-log.entity';
 
 export interface AuditLogFilter {
   actorId?: number;
   from?: Date; // occurredAt ≥ from
   to?: Date; // occurredAt < to
+  excludeActions?: AuditAction[];
   limit: number;
 }
 

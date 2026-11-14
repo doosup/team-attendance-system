@@ -28,7 +28,8 @@ export class InMemoryAuditLogRepository extends AuditLogRepository {
           (r) =>
             (f.actorId === undefined || r.actorId === f.actorId) &&
             (!f.from || r.occurredAt >= f.from) &&
-            (!f.to || r.occurredAt < f.to),
+            (!f.to || r.occurredAt < f.to) &&
+            !f.excludeActions?.includes(r.action),
         )
         .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
         .slice(0, f.limit),
