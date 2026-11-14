@@ -4,7 +4,14 @@ import {
 } from '../../src/domain/repository/request-day.repository';
 import { InMemoryRequestRepository } from './in-memory-request.repository';
 
-type Row = DayRequest & { userId: number; date: string; isOverLimit?: boolean };
+type Row = DayRequest & {
+  userId: number;
+  date: string;
+  isOverLimit?: boolean;
+  halfOffPart?: 'AM' | 'PM' | null;
+  startTime?: string | null;
+  endTime?: string | null;
+};
 
 // 직접 넣은 rows + (있으면) 신청 저장소의 날짜 행을 함께 본다
 export class InMemoryRequestDayRepository extends RequestDayRepository {
@@ -25,6 +32,9 @@ export class InMemoryRequestDayRepository extends RequestDayRepository {
         dayStatus: d.status,
         cancelType: d.cancelType,
         isOverLimit: r.props.isOverLimit,
+        halfOffPart: r.props.halfOffPart,
+        startTime: r.props.startTime,
+        endTime: r.props.endTime,
       })),
     );
     return [...this.rows, ...fromRequests];
@@ -94,7 +104,12 @@ export class InMemoryRequestDayRepository extends RequestDayRepository {
     return Promise.resolve(
       this.all()
         .filter((r) => r.date === date)
-        .map(({ date: _date, isOverLimit: _over, ...day }) => day),
+        .map(({ date: _date, isOverLimit: _over, ...day }) => ({
+          ...day,
+          halfOffPart: day.halfOffPart ?? null,
+          startTime: day.startTime ?? null,
+          endTime: day.endTime ?? null,
+        })),
     );
   }
 }

@@ -3,7 +3,13 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { api, ApiError } from '@/api/client';
 import type { Balance, BoardRow, MissingCheckout, Today } from '@/api/types';
 import ManualCheckoutModal from '@/components/ManualCheckoutModal.vue';
-import { BOARD_STATUS, DAY_TYPE, kstTime, minutesText } from '@/format';
+import {
+  BOARD_STATUS,
+  DAY_TYPE,
+  halfOffText,
+  kstTime,
+  minutesText,
+} from '@/format';
 import { useAuthStore } from '@/stores/auth';
 import { useClockStore } from '@/stores/clock';
 
@@ -168,7 +174,11 @@ async function press(path: '/attendance/check-in' | '/attendance/check-out') {
         <tr v-for="r in board" :key="r.userId">
           <td>{{ r.name }}</td>
           <td>
-            {{ BOARD_STATUS[r.status] ?? r.status }}
+            {{
+              r.halfOff
+                ? halfOffText(r.halfOff)
+                : (BOARD_STATUS[r.status] ?? r.status)
+            }}
             <span v-if="auth.isLead && r.pastTen" class="tag bad"
               >10시 경과</span
             >

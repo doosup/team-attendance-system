@@ -138,7 +138,8 @@ model Request {
   isOverLimit  Boolean
   reason       String
   ip           String?
-  startTime    String?
+  halfOffPart  HalfOffPart? // 반일 OFF 오전/오후 (선택, 표시용)
+  startTime    String? // 재택·주말: 접속 허용 시간대 / 반일 OFF: 반차 예정 시간(선택, 표시용)
   endTime      String?
   decidedById  Int?
   decidedAt    DateTime?
@@ -228,4 +229,9 @@ model AllowedIp {
   deletedAt   DateTime?
 
   createdBy User? @relation(fields: [createdById], references: [id])
+}
+
+enum HalfOffPart {
+  AM
+  PM
 }

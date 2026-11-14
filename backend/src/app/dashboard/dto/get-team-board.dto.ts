@@ -13,6 +13,12 @@ export interface TeamBoardRow {
   userId: number;
   name: string;
   status: BoardStatus;
+  // 승인된 반일 OFF의 오전/오후·반차 예정 시간 (모두에게, 적은 게 있을 때만, ATT-34)
+  halfOff?: {
+    part: 'AM' | 'PM' | null;
+    startTime: string | null;
+    endTime: string | null;
+  };
   dayType?: string | null;
   checkInAt?: string | null;
   checkOutAt?: string | null;

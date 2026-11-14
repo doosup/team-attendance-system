@@ -7,6 +7,8 @@ import {
 import { CustomException } from '../exception/custom.exception';
 import { User } from './user.entity';
 
+export type HalfOffPart = 'AM' | 'PM';
+
 export interface RequestDayProps {
   id: number | null;
   date: string;
@@ -27,6 +29,7 @@ export interface RequestProps {
   isOverLimit: boolean;
   reason: string;
   ip: string | null;
+  halfOffPart: HalfOffPart | null; // 반일 OFF 오전/오후 (표시용, ATT-34)
   startTime: string | null;
   endTime: string | null;
   decidedById: number | null;
@@ -49,6 +52,7 @@ export class Request {
       | 'isOverLimit'
       | 'reason'
       | 'ip'
+      | 'halfOffPart'
       | 'startTime'
       | 'endTime'
     >,

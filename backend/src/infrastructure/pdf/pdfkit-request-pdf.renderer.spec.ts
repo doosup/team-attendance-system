@@ -27,6 +27,7 @@ describe('PdfkitRequestPdfRenderer', () => {
       ],
       reason: '가족 행사',
       ip: null,
+      halfOffPart: null,
       startTime: null,
       endTime: null,
       deciderName: '이리드',

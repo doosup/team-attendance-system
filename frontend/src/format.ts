@@ -1,3 +1,5 @@
+import type { HalfOff } from '@/api/types';
+
 // 표시는 언제나 KST (decisions 13). 브라우저 시간대와 무관하게 같은 값을 보여 준다.
 const KST = 'Asia/Seoul';
 
@@ -27,6 +29,15 @@ export const minutesText = (m: number | null | undefined) =>
 /** 'YYYY-MM-DD' + 'HH:mm(:ss)' (KST) → 오프셋 있는 ISO */
 export const kstIso = (date: string, time: string) =>
   `${date}T${time.length === 5 ? `${time}:00` : time}+09:00`;
+
+/** 반일 OFF 표시: '오전 OFF 09:00~13:00'. 오전/오후를 안 적었으면 '반일 OFF' (ATT-34) */
+export const halfOffText = (h: HalfOff) =>
+  [
+    h.part === 'AM' ? '오전 OFF' : h.part === 'PM' ? '오후 OFF' : '반일 OFF',
+    h.startTime && `${h.startTime}~${h.endTime ?? ''}`,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
 export const DAY_TYPE: Record<string, string> = {
   FULL_DAY: '일반 근무',

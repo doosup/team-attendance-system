@@ -123,6 +123,17 @@ export class PdfkitRequestPdfRenderer extends RequestPdfRenderer {
         '접속 IP · 시간대',
         `${d.ip} · ${d.startTime ?? ''} ~ ${d.endTime ?? ''}`,
       );
+    else if (d.type === 'HALF_OFF' && (d.halfOffPart || d.startTime))
+      // 반일 OFF: 언제 쉬는지 (ATT-34). 판정은 실제 근무 4시간 기준
+      row(
+        '반차 예정 시간',
+        [
+          d.halfOffPart && (d.halfOffPart === 'AM' ? '오전 OFF' : '오후 OFF'),
+          d.startTime && `${d.startTime} ~ ${d.endTime ?? ''}`,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      );
     row('사유', d.reason || '-');
     row('상태', STATUS[d.status]);
     if (d.rejectReason) row('반려 사유', d.rejectReason);
