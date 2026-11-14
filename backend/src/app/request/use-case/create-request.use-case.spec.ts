@@ -54,6 +54,7 @@ describe('CreateRequestUseCase', () => {
 
   it('연차 기간 신청은 영업일마다 날짜 행을 만들고 대기 상태로 접수한다', async () => {
     const r = await useCase.execute({
+      ip: '127.0.0.1',
       user: KIM,
       input: annual('2026-11-13', '2026-11-16'),
     });
@@ -63,6 +64,7 @@ describe('CreateRequestUseCase', () => {
 
   it('연차는 신청 시 영업일 수만큼 바로 차감한다 (금~월 = 2일)', async () => {
     await useCase.execute({
+      ip: '127.0.0.1',
       user: KIM,
       input: annual('2026-11-13', '2026-11-16'),
     });
@@ -113,6 +115,7 @@ describe('CreateRequestUseCase', () => {
 
   it('리드 본인 신청은 자동 승인된다', async () => {
     const r = await useCase.execute({
+      ip: '127.0.0.1',
       user: LEAD,
       input: annual('2026-11-16'),
     });
@@ -121,6 +124,7 @@ describe('CreateRequestUseCase', () => {
 
   it('재택 IP는 정규화해 저장하고, 형식이 틀리면 INVALID_IP_FORMAT', async () => {
     const r = await useCase.execute({
+      ip: '127.0.0.1',
       user: KIM,
       input: { ...remote('2026-11-16'), ip: ' ::ffff:10.0.0.7 ' },
     });
@@ -217,6 +221,7 @@ describe('CreateRequestUseCase', () => {
 
     it('리드 본인의 예외 신청도 자동 승인된다 (예외 표시는 남음)', async () => {
       await useCase.execute({
+        ip: '127.0.0.1',
         user: LEAD,
         input: remote('2026-11-16', '2026-11-17'),
       });

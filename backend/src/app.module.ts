@@ -20,6 +20,7 @@ import { ClockModule } from './infrastructure/clock/clock.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { PrismaService } from './infrastructure/prisma/prisma.service';
 import { RepositoryModule } from './infrastructure/prisma/repository.module';
+import { PdfModule } from './infrastructure/pdf/pdf.module';
 import { TokenModule } from './infrastructure/token/token.module';
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -43,6 +44,7 @@ const isDev = process.env.NODE_ENV !== 'production';
     RepositoryModule,
     ClockModule,
     TokenModule,
+    PdfModule,
     AuthModule,
     AttendanceModule,
     BalanceModule,

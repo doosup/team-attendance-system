@@ -164,6 +164,30 @@ describe('핵심 흐름 (e2e)', () => {
     );
   });
 
+  it('신청서 PDF: { data }로 감싸지 않은 파일로 내려가고, 팀원은 남의 신청서를 받을 수 없다', async () => {
+    await setClock('2026-11-11', '10:00:00');
+    const created = await as('lead')
+      .post('/requests', {
+        type: 'ANNUAL',
+        startDate: '2026-11-18',
+        endDate: '2026-11-18',
+      })
+      .expect(201);
+    const requestId = created.body.data.id as number;
+
+    const pdf = await as('lead')
+      .get(`/requests/${requestId}/pdf`)
+      .responseType('blob')
+      .expect(200);
+    expect(pdf.headers['content-type']).toBe('application/pdf');
+    expect((pdf.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+
+    const denied = await as('kim')
+      .get(`/requests/${requestId}/pdf`)
+      .expect(404);
+    expect(denied.body.error.code).toBe('REQUEST_NOT_FOUND');
+  });
+
   it('등록되지 않은 IP는 403 IP_NOT_ALLOWED (같은 컴퓨터 프록시가 넘긴 X-Forwarded-For 기준)', async () => {
     const res = await request(http)
       .get('/attendance/today')

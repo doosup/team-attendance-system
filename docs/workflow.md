@@ -56,7 +56,7 @@
 1. 사용자가 GitHub Desktop에서 `<type>/ATT-<n>-<설명>` 브랜치를 만들고 티켓 번호를 알려준다.
 2. Claude는 `docs/design.md`에서 해당 API·테이블·에러 코드를, `docs/decisions.md`에서 관련 규칙을 먼저 확인한다.
 3. 정책·엔티티는 테스트 먼저 (실패하는 테스트 → 구현 → 통과).
-4. `npm test`(해당 범위)와 lint가 통과하는지 확인한다.
+4. `npm test`(해당 범위), `npm run typecheck`, lint가 통과하는지 확인한다. jest는 타입 검사 없이 돌고 빌드는 `*.spec.ts`를 빼므로, 테스트 코드의 타입 오류는 `typecheck`로만 잡힌다.
 5. 커밋 메시지·PR 제목/본문 제안을 남긴다. 커밋·푸시·PR은 사용자가 한다.
 6. 설계와 다르게 구현해야 할 일이 생기면 코드를 바꾸기 전에 사용자에게 먼저 묻는다. 결정되면 `docs/decisions.md` 또는 `docs/design.md`도 함께 고친다.
 
