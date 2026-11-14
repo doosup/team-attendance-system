@@ -46,18 +46,33 @@ async function loadLogs() {
   logs.value = await api<AuditLog[]>('GET', `/lead/audit-logs?${q}`);
 }
 
+// 카드마다 따로 불러온다: 한 목록이 실패해도 나머지 카드는 보이게 (오류는 첫 번째만 표시)
 async function load() {
-  await guard(async () => {
-    [pending.value, approved.value, missing.value, ips.value, members.value] =
-      await Promise.all([
-        api<LeaveRequest[]>('GET', '/lead/requests?status=PENDING'),
-        api<LeaveRequest[]>('GET', '/lead/requests?status=APPROVED'),
-        api<MissingCheckout[]>('GET', '/lead/missing-checkouts'),
-        api<AllowedIp[]>('GET', '/lead/allowed-ips'),
-        api<Member[]>('GET', '/lead/users'),
-      ]);
-    await loadLogs();
-  });
+  error.value = '';
+  const fail = (e: unknown) => {
+    error.value ||=
+      e instanceof ApiError ? e.message : '불러오지 못한 목록이 있습니다';
+  };
+  await Promise.all([
+    api<LeaveRequest[]>('GET', '/lead/requests?status=PENDING').then(
+      (r) => (pending.value = r),
+      fail,
+    ),
+    api<LeaveRequest[]>('GET', '/lead/requests?status=APPROVED').then(
+      (r) => (approved.value = r),
+      fail,
+    ),
+    api<MissingCheckout[]>('GET', '/lead/missing-checkouts').then(
+      (r) => (missing.value = r),
+      fail,
+    ),
+    api<AllowedIp[]>('GET', '/lead/allowed-ips').then(
+      (r) => (ips.value = r),
+      fail,
+    ),
+    api<Member[]>('GET', '/lead/users').then((r) => (members.value = r), fail),
+    loadLogs().catch(fail),
+  ]);
 }
 onMounted(load);
 watch(() => clock.version, load);
