@@ -116,12 +116,11 @@ export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
     return RequestResult.from(saved);
   }
 
+  // 재택·주말 근무: IP + 시간대(접속 허용), 반일 OFF: 근무 예정 시간대만(표시용, ATT-34)
   private ipAndTime(input: CreateRequestRequest) {
-    if (input.type !== 'REMOTE' && input.type !== 'WEEKEND_WORK') {
+    if (input.type === 'ANNUAL') {
       return { ip: null, startTime: null, endTime: null };
     }
-    const ip = normalizeIp(input.ip ?? '');
-    if (!isValidIp(ip)) throw new CustomException('INVALID_IP_FORMAT');
     const { startTime = '', endTime = '' } = input;
     if (startTime >= endTime) {
       throw new CustomException(
@@ -129,6 +128,9 @@ export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
         'startTime은 endTime보다 일러야 합니다',
       );
     }
+    if (input.type === 'HALF_OFF') return { ip: null, startTime, endTime };
+    const ip = normalizeIp(input.ip ?? '');
+    if (!isValidIp(ip)) throw new CustomException('INVALID_IP_FORMAT');
     return { ip, startTime, endTime };
   }
 

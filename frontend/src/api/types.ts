@@ -46,6 +46,7 @@ export interface BoardRow {
   userId: number;
   name: string;
   status: string;
+  halfOffTime?: string; // 반일 OFF 근무 예정 'HH:mm~HH:mm'
   dayType?: string | null;
   checkInAt?: string | null;
   checkOutAt?: string | null;

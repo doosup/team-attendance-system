@@ -169,6 +169,9 @@ async function press(path: '/attendance/check-in' | '/attendance/check-out') {
           <td>{{ r.name }}</td>
           <td>
             {{ BOARD_STATUS[r.status] ?? r.status }}
+            <span v-if="r.halfOffTime" class="muted">
+              · {{ r.halfOffTime }} 근무 예정
+            </span>
             <span v-if="auth.isLead && r.pastTen" class="tag bad"
               >10시 경과</span
             >

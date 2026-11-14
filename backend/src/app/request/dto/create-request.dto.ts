@@ -17,6 +17,9 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 // 재택·주말 근무는 신청한 IP·시간대에서만 출퇴근 (FR-ATT-04, A8)
 const needsIpAndTime = (o: CreateRequestRequest) =>
   o.type === 'REMOTE' || o.type === 'WEEKEND_WORK';
+// 반일 OFF는 IP 없이 근무 예정 시간대만: 팀이 언제 나오는지 미리 알게 (ATT-34, 판정에는 안 씀)
+const needsTime = (o: CreateRequestRequest) =>
+  needsIpAndTime(o) || o.type === 'HALF_OFF';
 
 export class CreateRequestRequest {
   @IsIn(TYPES)
@@ -41,11 +44,11 @@ export class CreateRequestRequest {
   @MaxLength(45)
   ip?: string;
 
-  @ValidateIf(needsIpAndTime)
+  @ValidateIf(needsTime)
   @Matches(TIME, { message: 'startTime은 HH:mm 형식입니다' })
   startTime?: string;
 
-  @ValidateIf(needsIpAndTime)
+  @ValidateIf(needsTime)
   @Matches(TIME, { message: 'endTime은 HH:mm 형식입니다' })
   endTime?: string;
 }

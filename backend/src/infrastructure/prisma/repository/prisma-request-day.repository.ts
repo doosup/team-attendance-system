@@ -90,7 +90,11 @@ export class PrismaRequestDayRepository extends RequestDayRepository {
   async findByDate(date: string) {
     const rows = await this.tx.requestDay.findMany({
       where: { date },
-      include: { request: { select: { type: true, status: true } } },
+      include: {
+        request: {
+          select: { type: true, status: true, startTime: true, endTime: true },
+        },
+      },
     });
     return rows.map((r) => ({
       userId: r.userId,
@@ -99,6 +103,8 @@ export class PrismaRequestDayRepository extends RequestDayRepository {
       requestStatus: r.request.status,
       dayStatus: r.status,
       cancelType: r.cancelType,
+      startTime: r.request.startTime,
+      endTime: r.request.endTime,
     }));
   }
 }

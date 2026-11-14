@@ -13,6 +13,7 @@ export interface TeamBoardRow {
   userId: number;
   name: string;
   status: BoardStatus;
+  halfOffTime?: string; // 반일 OFF 근무 예정 'HH:mm~HH:mm' (모두에게, ATT-34)
   dayType?: string | null;
   checkInAt?: string | null;
   checkOutAt?: string | null;

@@ -235,6 +235,25 @@ describe('CreateRequestUseCase', () => {
   });
 
   describe('반일 OFF', () => {
+    it('근무 예정 시간대도 시작이 종료보다 일러야 한다 (ATT-34)', async () => {
+      expect(
+        await codeOf(
+          useCase.execute({
+            ip: '127.0.0.1',
+            user: KIM,
+            input: {
+              type: 'HALF_OFF',
+              startDate: '2026-11-16',
+              endDate: '2026-11-16',
+              reason: '',
+              startTime: '17:00',
+              endTime: '13:00',
+            },
+          }),
+        ),
+      ).toBe('VALIDATION_FAILED');
+    });
+
     it('OFF가 없으면 INSUFFICIENT_BALANCE', async () => {
       expect(
         await codeOf(
@@ -246,6 +265,8 @@ describe('CreateRequestUseCase', () => {
               startDate: '2026-11-16',
               endDate: '2026-11-16',
               reason: '',
+              startTime: '13:00',
+              endTime: '17:00',
             },
           }),
         ),
@@ -274,7 +295,14 @@ describe('CreateRequestUseCase', () => {
           startDate: '2026-11-16',
           endDate: '2026-11-16',
           reason: '',
+          startTime: '13:00',
+          endTime: '17:00',
         },
+      });
+      expect(r).toMatchObject({
+        ip: null,
+        startTime: '13:00',
+        endTime: '17:00',
       });
       const use = ledger.rows.find((e) => e.props.event === 'USE');
       expect(use?.props).toMatchObject({

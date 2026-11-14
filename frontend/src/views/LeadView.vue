@@ -176,8 +176,9 @@ const period = (r: LeaveRequest) =>
           </td>
           <td>
             {{ r.reason || '-' }}
-            <div v-if="r.ip" class="muted">
-              {{ r.ip }} · {{ r.startTime }}~{{ r.endTime }}
+            <div v-if="r.startTime" class="muted">
+              {{ r.ip ? `${r.ip} ·` : '근무 예정' }}
+              {{ r.startTime }}~{{ r.endTime }}
             </div>
           </td>
           <td class="row">

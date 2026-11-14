@@ -46,6 +46,27 @@ describe('대시보드', () => {
       });
     });
 
+    it('반일 OFF인 사람은 팀원에게도 근무 예정 시간대가 보인다 (ATT-34)', async () => {
+      requestDays.rows.push({
+        requestDayId: 1,
+        userId: LEAD.id,
+        date: '2026-11-16',
+        type: 'HALF_OFF',
+        requestStatus: 'APPROVED',
+        dayStatus: 'ACTIVE',
+        cancelType: null,
+        startTime: '13:00',
+        endTime: '17:00',
+      });
+      const rows = await board(KIM);
+      expect(rows.find((r) => r.userId === LEAD.id)).toEqual({
+        userId: LEAD.id,
+        name: '이리드',
+        status: 'HALF_OFF',
+        halfOffTime: '13:00~17:00',
+      });
+    });
+
     it('리드에게는 시각·지각·10시 경과 미출근까지 보인다', async () => {
       await checkIn.execute({ user: KIM, ip: '127.0.0.1' });
       const rows = await board(LEAD);

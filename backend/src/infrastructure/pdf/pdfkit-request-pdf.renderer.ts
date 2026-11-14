@@ -123,6 +123,8 @@ export class PdfkitRequestPdfRenderer extends RequestPdfRenderer {
         '접속 IP · 시간대',
         `${d.ip} · ${d.startTime ?? ''} ~ ${d.endTime ?? ''}`,
       );
+    else if (d.startTime && d.endTime)
+      row('근무 예정 시간', `${d.startTime} ~ ${d.endTime}`); // 반일 OFF (ATT-34)
     row('사유', d.reason || '-');
     row('상태', STATUS[d.status]);
     if (d.rejectReason) row('반려 사유', d.rejectReason);

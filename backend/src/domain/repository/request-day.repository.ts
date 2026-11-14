@@ -30,8 +30,12 @@ export abstract class RequestDayRepository {
     date: string,
     ip: string,
   ): Promise<{ userId: number; startTime: string; endTime: string }[]>;
-  // 그날 모든 사람의 신청 (팀 보드)
-  abstract findByDate(
-    date: string,
-  ): Promise<(DayRequest & { userId: number })[]>;
+  // 그날 모든 사람의 신청 (팀 보드). 시간대는 반일 OFF 근무 예정 표시용
+  abstract findByDate(date: string): Promise<
+    (DayRequest & {
+      userId: number;
+      startTime: string | null;
+      endTime: string | null;
+    })[]
+  >;
 }
