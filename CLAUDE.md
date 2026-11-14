@@ -47,7 +47,6 @@ infrastructure/
 common/
   decorators/ filters/(→ { error }) guards/(ip, jwt-auth, roles) interceptors/(→ { data }) pipes/
   utils/                     ip.util.ts
-config/
 ```
 - 파일명 = 기능명(kebab-case) + 역할 접미사. 예: `approve-request.controller.ts` / `.dto.ts` / `.use-case.ts`
 - 상세 표와 근거: `docs/design.md` 디렉토리 구조, ADR-006·007

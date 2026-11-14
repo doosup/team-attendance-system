@@ -1,4 +1,4 @@
-import { DayType } from '../entity/attendance.entity';
+import type { DayType } from '../entity/attendance.entity';
 import { CustomException } from '../exception/custom.exception';
 import { DayRequest, RequestType } from '../repository/request-day.repository';
 import { msOfDayKst, workDateOf } from '../value/work-date';

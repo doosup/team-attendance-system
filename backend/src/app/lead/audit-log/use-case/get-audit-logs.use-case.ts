@@ -4,7 +4,7 @@ import { addDays, kstAt } from '../../../../domain/value/work-date';
 import { UseCase } from '../../../use-case.interface';
 import { AuditLogResult, GetAuditLogsQuery } from '../dto/get-audit-logs.dto';
 
-// shortcut: 최신 200건까지만 돌려준다, 이력이 많아지면 커서 페이징(paging.ts) 추가.
+// shortcut: 최신 200건까지만 돌려준다, 이력이 많아지면 커서 페이징 추가.
 const LIMIT = 200;
 
 @Injectable()
