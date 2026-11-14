@@ -169,7 +169,8 @@ const period = (r: LeaveRequest) =>
           <td>{{ r.userName }}</td>
           <td>
             {{ REQUEST_TYPE[r.type] }}
-            <span v-if="r.isOverLimit" class="tag warn">예외 신청</span>
+            <span v-if="r.isOverLimit" class="tag warn">한도 초과</span>
+            <span v-if="r.isAfterDeadline" class="tag warn">기한 후</span>
           </td>
           <td>
             {{ period(r) }} <span class="muted">({{ r.days.length }}일)</span>

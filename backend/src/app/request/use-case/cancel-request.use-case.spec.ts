@@ -107,6 +107,43 @@ describe('신청 취소', () => {
       expect(await codeOf(selfCancel(r.id, LEAD))).toBe('REQUEST_NOT_FOUND');
     });
 
+    describe('기한 후 예외 신청 (A22)', () => {
+      const late = () => {
+        clock.at('2026-11-12', '20:00:00'); // 금 연차의 기한(목 17:00)이 지남
+        return create.execute({
+          user: KIM,
+          ip: '127.0.0.1',
+          input: {
+            type: 'ANNUAL',
+            startDate: '2026-11-13',
+            endDate: '2026-11-13',
+            reason: '조부상',
+          },
+        });
+      };
+
+      it('리드가 결정하기 전이고 시작 전이면 본인이 철회하고 연차를 돌려받는다', async () => {
+        const r = await late();
+        expect(await annualDays()).toBe(9);
+        expect((await selfCancel(r.id)).status).toBe('CANCELED');
+        expect(await annualDays()).toBe(10);
+      });
+
+      it('승인된 뒤에는 기한 규칙대로 REQUEST_DEADLINE_PASSED', async () => {
+        const r = await late();
+        await approve.execute({ lead: LEAD, requestId: r.id, ip: '127.0.0.1' });
+        expect(await codeOf(selfCancel(r.id))).toBe('REQUEST_DEADLINE_PASSED');
+      });
+
+      it('시작일이 되면 대기 중이어도 리드만 처리할 수 있다', async () => {
+        const r = await late();
+        clock.at('2026-11-13', '08:00:00');
+        expect(await codeOf(selfCancel(r.id))).toBe(
+          'SAME_DAY_CANCEL_LEAD_ONLY',
+        );
+      });
+    });
+
     it('취소한 날짜는 다시 신청할 수 있다', async () => {
       const r = await annual('2026-11-16');
       await selfCancel(r.id);

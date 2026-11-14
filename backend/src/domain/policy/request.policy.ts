@@ -2,7 +2,7 @@ import { CustomException } from '../exception/custom.exception';
 import { RequestType } from '../repository/request-day.repository';
 import { isBusinessDay, previousBusinessDay } from '../value/business-day';
 import { HOLIDAY_YEARS } from '../value/holidays';
-import { addDays, kstAt } from '../value/work-date';
+import { addDays, kstAt, workDateOf } from '../value/work-date';
 
 const REMOTE_MONTHLY_LIMIT = 2;
 
@@ -48,10 +48,14 @@ export function datesForRequest(
 export const deadlineOf = (startDate: string): Date =>
   kstAt(previousBusinessDay(startDate), '17:00:00');
 
-/** 신청·본인 취소 기한: 17:00:00까지 허용, 17:00:01부터 거부 (결정 5) */
-export function assertBeforeDeadline(now: Date, startDate: string): void {
-  if (now > deadlineOf(startDate)) {
-    throw new CustomException('REQUEST_DEADLINE_PASSED');
+/** 신청 기한: 17:00:00까지 일반 신청, 17:00:01부터 기한 후 예외 신청 (결정 5, A22) */
+export const isAfterDeadline = (now: Date, startDate: string): boolean =>
+  now > deadlineOf(startDate);
+
+/** 오늘·지난 날짜는 예외 신청으로도 받지 않는다: 지각 뒤 연차로 바꾸는 소급을 막음 (A22) */
+export function assertNotStarted(now: Date, startDate: string): void {
+  if (startDate <= workDateOf(now)) {
+    throw new CustomException('PAST_DATE_REQUEST');
   }
 }
 

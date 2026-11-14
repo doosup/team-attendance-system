@@ -40,6 +40,7 @@ describe('IpGuard', () => {
         startDate: '2026-11-16',
         endDate: '2026-11-16',
         isOverLimit: false,
+        isAfterDeadline: false,
         reason: '',
         ip: '10.0.0.7',
         halfOffPart: null,

@@ -7,8 +7,9 @@ import { User } from '../../../domain/entity/user.entity';
 import { CustomException } from '../../../domain/exception/custom.exception';
 import { balanceOf, pickOffGrant } from '../../../domain/policy/balance.policy';
 import {
-  assertBeforeDeadline,
+  assertNotStarted,
   datesForRequest,
+  isAfterDeadline,
   isRemoteOverLimit,
 } from '../../../domain/policy/request.policy';
 import { Clock } from '../../../domain/port/clock.port';
@@ -23,7 +24,7 @@ import { CreateRequestRequest, RequestResult } from '../dto/create-request.dto';
 
 type Input = { user: User; input: CreateRequestRequest; ip: string };
 
-// 신청: 날짜 계산 → 기한 → 중복 → 재택 한도 → 잔여 → 저장 → 원장 차감 (한 트랜잭션)
+// 신청: 날짜 계산 → 기한 → 중복 → 재택 한도 → 잔여 → 저장 → 원장 차감 (한 트랜잭션). 기한 후는 사유를 받아 예외 신청
 @Injectable()
 export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
   constructor(
@@ -42,7 +43,12 @@ export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
     const reason = input.reason?.trim() ?? '';
 
     const dates = datesForRequest(type, startDate, endDate);
-    assertBeforeDeadline(now, startDate);
+    assertNotStarted(now, startDate);
+    // 기한이 지나도 거부하지 않고 예외 신청으로: 리드가 승인으로 판단 (A22)
+    const late = isAfterDeadline(now, startDate);
+    if (late && !reason) {
+      throw new CustomException('LATE_REASON_REQUIRED');
+    }
     const window = this.ipAndTime(input);
 
     if ((await this.requestDays.findLiveDates(user.id, dates)).length > 0) {
@@ -71,7 +77,15 @@ export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
 
     const saved = await this.requests.create(
       Request.submit(
-        { type, startDate, endDate, isOverLimit, reason, ...window },
+        {
+          type,
+          startDate,
+          endDate,
+          isOverLimit,
+          isAfterDeadline: late,
+          reason,
+          ...window,
+        },
         user,
         dates,
         now,
@@ -108,6 +122,7 @@ export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
         dates,
         status: saved.props.status,
         isOverLimit,
+        isAfterDeadline: late,
         autoApproved: saved.props.status === 'APPROVED',
       },
       ip,

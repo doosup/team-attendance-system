@@ -43,6 +43,7 @@ export class GetRequestPdfUseCase implements UseCase<Input, Buffer> {
       type: p.type,
       status: p.status,
       isOverLimit: p.isOverLimit,
+      isAfterDeadline: p.isAfterDeadline,
       applicantName,
       startDate: p.startDate,
       endDate: p.endDate,

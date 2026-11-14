@@ -24,6 +24,9 @@ export const ERROR_MESSAGES = {
   WEEKEND_WORK_NOT_HOLIDAY:
     '주말·공휴일 근무는 주말·공휴일에만 신청할 수 있습니다',
   REQUEST_DEADLINE_PASSED: '신청 기한(시작일의 직전 영업일 17:00)이 지났습니다',
+  PAST_DATE_REQUEST: '오늘이나 지난 날짜는 신청할 수 없습니다',
+  LATE_REASON_REQUIRED:
+    '신청 기한(시작일의 직전 영업일 17:00)이 지난 예외 신청은 사유가 필요합니다',
   INSUFFICIENT_BALANCE: '잔여가 부족합니다',
   OVERLAPPING_REQUEST: '이미 신청이 있는 날짜와 겹칩니다',
   INVALID_IP_FORMAT: 'IP 형식이 올바르지 않습니다',

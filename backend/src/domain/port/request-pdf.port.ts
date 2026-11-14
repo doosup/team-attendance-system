@@ -11,6 +11,7 @@ export interface RequestDocument {
   type: RequestType;
   status: RequestStatus;
   isOverLimit: boolean;
+  isAfterDeadline: boolean;
   applicantName: string;
   startDate: string;
   endDate: string;

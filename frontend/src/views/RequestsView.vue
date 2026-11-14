@@ -92,11 +92,15 @@ async function submit() {
         ? { startTime: form.startTime, endTime: form.endTime }
         : {}),
     });
+    const exceptions = [
+      r.isAfterDeadline && '기한 후',
+      r.isOverLimit && '재택 한도 초과',
+    ].filter(Boolean);
     notice.value =
       r.status === 'APPROVED'
         ? '신청이 자동 승인되었습니다'
-        : r.isOverLimit
-          ? '재택 한도를 넘어 예외 신청으로 접수되었습니다 (리드 승인 필요)'
+        : exceptions.length
+          ? `${exceptions.join('·')} 예외 신청으로 접수되었습니다 (리드 승인 필요)`
           : '신청이 접수되었습니다 (리드 승인 대기)';
     await load();
   } catch (e) {
@@ -218,11 +222,16 @@ async function pdf(r: LeaveRequest) {
           v-model="form.reason"
           size="40"
           :placeholder="
-            tab === 'WORK' ? '재택 한도 초과 예외 신청은 필수' : '선택'
+            tab === 'WORK'
+              ? '선택 (기한 후·재택 한도 초과 예외 신청은 필수)'
+              : '선택 (기한 후 예외 신청은 필수)'
           "
         />
       </label>
-      <p class="muted">기한: 시작일의 직전 영업일 17:00:00까지</p>
+      <p class="muted">
+        기한: 시작일의 직전 영업일 17:00:00까지. 지나면 사유를 적어 예외
+        신청으로 접수되고 리드가 승인합니다 (오늘·지난 날짜는 불가)
+      </p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-if="notice" class="tag ok">{{ notice }}</p>
       <div><button class="primary" type="submit">신청</button></div>
@@ -254,7 +263,8 @@ async function pdf(r: LeaveRequest) {
               tabOf(r.type) === 'LEAVE' ? '휴가' : '근무'
             }}</span>
             {{ REQUEST_TYPE[r.type] }}
-            <span v-if="r.isOverLimit" class="tag warn">예외</span>
+            <span v-if="r.isOverLimit" class="tag warn">한도 초과</span>
+            <span v-if="r.isAfterDeadline" class="tag warn">기한 후</span>
           </td>
           <td>
             {{ r.startDate

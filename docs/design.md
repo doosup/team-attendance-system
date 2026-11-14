@@ -62,6 +62,7 @@ erDiagram
         string endDate "YYYY-MM-DD"
         RequestStatus status "PENDING | APPROVED | REJECTED | CANCELED"
         boolean isOverLimit "재택 한도 초과 예외 신청"
+        boolean isAfterDeadline "기한 후 예외 신청 (A22)"
         string reason
         string ip "nullable, REMOTE·WEEKEND_WORK"
         HalfOffPart halfOffPart "nullable, AM | PM (반일 OFF, 표시용)"
@@ -143,6 +144,7 @@ erDiagram
 - 본인 취소 = 모든 RequestDay를 CANCELED + Request를 CANCELED (`SELF_BEFORE_DEADLINE`)
 - 리드 당일 취소 = 그날 RequestDay 하나만 CANCELED (`LEAD_SAME_DAY`), Request는 APPROVED 유지 → 그날은 긴급 출근
 - `isOverLimit`: 재택 한도를 넘는 신청이면 true. 신청서 전체가 예외 신청이 되고, 자동 승인 대상이 아님(리드 본인 제외)
+- `isAfterDeadline`: 시작일의 직전 영업일 17:00:00이 지나서 낸 신청이면 true. 사유 필수, 자동 승인 대상이 아님(리드 본인 제외, 결정 A22)
 - 잔여 차감·복원, 재택 월 한도, 팀 보드 조회는 모두 RequestDay 기준 (날짜 단위)
 - 중복 신청 방지: "같은 사람·같은 날·ACTIVE 행"은 하나여야 하지만 취소 행은 제외해야 해서 단순 유일 제약 불가 → 유스케이스에서 트랜잭션 안에 확인
 - `userId`를 RequestDay에도 둔 이유: 날짜별 중복 확인·팀 보드 조회 때 Request를 거치지 않고 바로 찾기 위해
@@ -328,7 +330,7 @@ backend/src/
 | 출퇴근 | POST | /attendance/:id/manual-check-out | 미기록 퇴근 직접 입력 `{ checkOutAt }` | 본인 | FR-ATT-03 |
 | 출퇴근 | POST | /attendance/check-out | 퇴근. 미기록 퇴근이 남아 있으면 `PENDING_MANUAL_CHECKOUT`로 거부 | 로그인 | FR-ATT-02, 04 |
 | 출퇴근 | GET | /attendance/me?month= | 내 월별 기록 | 로그인 | FR-DSH-01 |
-| 신청 | POST | /requests | 신청 `{ type, startDate, endDate, reason, ip?, halfOffPart?, startTime?, endTime? }`. 재택·주말 근무는 IP·시간대 필수. 반일 OFF는 오전/오후(`AM`·`PM`)와 반차 예정 시간(쉬는 시간대)을 **선택**으로 받음(표시용, 시간을 적으면 둘 다, 결정 A21). 반일 OFF·주말 근무는 startDate = endDate. 재택 한도 초과면 `isOverLimit: true`로 접수 | 로그인 | FR-REQ-01 |
+| 신청 | POST | /requests | 신청 `{ type, startDate, endDate, reason, ip?, halfOffPart?, startTime?, endTime? }`. 재택·주말 근무는 IP·시간대 필수. 반일 OFF는 오전/오후(`AM`·`PM`)와 반차 예정 시간(쉬는 시간대)을 **선택**으로 받음(표시용, 시간을 적으면 둘 다, 결정 A21). 반일 OFF·주말 근무는 startDate = endDate. 재택 한도 초과면 `isOverLimit: true`, 기한 후면 `isAfterDeadline: true`(사유 필수)로 접수. 오늘·지난 날짜는 거부 | 로그인 | FR-REQ-01 |
 | 신청 | GET | /requests/me | 내 신청 목록 (날짜별 상태 포함) | 로그인 | FR-REQ-01 |
 | 신청 | POST | /requests/:id/cancel | 본인 전체 취소 (시작일의 직전 영업일 17:00:00까지) | 본인 | FR-REQ-01 |
 | 신청 | GET | /requests/:id/pdf | 신청서 PDF 내려받기 (선택). `application/pdf` 파일 자체로 응답 (`{ data }` 감싸지 않음) | 본인·리드 | FR-REQ-03 |
@@ -426,7 +428,9 @@ backend/src/
 | MANUAL_CHECKOUT_NOT_PENDING | 409 | 직접 입력 대상(직전 근무일의 미기록 1건)이 아님. 남의 기록·오늘 기록·이미 입력한 기록 모두 같은 응답 |
 | INVALID_DATE_RANGE | 422 | 종료일이 시작일보다 이르거나, 하루만 가능한 종류에 기간을 넣음, 공휴일 데이터가 없는 연도 |
 | NO_BUSINESS_DAY_IN_RANGE | 422 | 연차·재택 기간에 영업일이 하나도 없음 |
-| REQUEST_DEADLINE_PASSED | 422 | 시작일의 직전 영업일 17:00:00 이후 신청·본인 취소 |
+| REQUEST_DEADLINE_PASSED | 422 | 시작일의 직전 영업일 17:00:00 이후 본인 취소 (신청은 기한 후 예외 신청으로 받음) |
+| PAST_DATE_REQUEST | 422 | 오늘이나 지난 날짜 신청 (기한 후 예외 신청도 내일부터, A22) |
+| LATE_REASON_REQUIRED | 422 | 기한 후 예외 신청에 사유가 없음 (A22) |
 | INSUFFICIENT_BALANCE | 422 | 연차·OFF 잔여 부족 |
 | WEEKEND_WORK_NOT_HOLIDAY | 422 | 영업일에 주말·공휴일 근무 신청 |
 | OVERLAPPING_REQUEST | 409 | 이미 신청이 있는 날짜와 겹침 |
@@ -448,7 +452,7 @@ backend/src/
 | USER_NOT_FOUND | 404 | 리드가 없는(또는 퇴사한) 사용자의 원장 조회·퇴사 처리 |
 | VALIDATION_FAILED | 400 | 입력 형식 오류 (DTO 검증) |
 
-재택 한도 초과는 에러가 아니라 예외 신청(`isOverLimit: true`)으로 접수된다.
+재택 한도 초과와 기한 후 신청은 에러가 아니라 예외 신청(`isOverLimit: true` / `isAfterDeadline: true`)으로 접수된다.
 
 표에 없는 HTTP 오류(존재하지 않는 경로 등)는 상태 이름을 코드로 쓴다 (예: 404 `NOT_FOUND`). 예상하지 못한 오류는 500 `INTERNAL_ERROR`.
 

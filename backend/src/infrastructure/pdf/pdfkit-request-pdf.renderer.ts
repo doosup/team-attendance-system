@@ -94,7 +94,9 @@ export class PdfkitRequestPdfRenderer extends RequestPdfRenderer {
     row('신청자', d.applicantName);
     row(
       '종류',
-      TYPE[d.type] + (d.isOverLimit ? ' (재택 한도 초과 예외 신청)' : ''),
+      TYPE[d.type] +
+        (d.isOverLimit ? ' (재택 한도 초과 예외 신청)' : '') +
+        (d.isAfterDeadline ? ' (기한 후 예외 신청)' : ''),
     );
     row(
       '기간',

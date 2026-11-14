@@ -8,6 +8,7 @@ describe('PdfkitRequestPdfRenderer', () => {
       type: 'ANNUAL',
       status: 'APPROVED',
       isOverLimit: false,
+      isAfterDeadline: false,
       applicantName: '김근태',
       startDate: '2026-11-20',
       endDate: '2026-11-23',

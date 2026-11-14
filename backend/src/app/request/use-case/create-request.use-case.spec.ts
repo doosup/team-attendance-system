@@ -83,17 +83,75 @@ describe('CreateRequestUseCase', () => {
     ).toBe('INSUFFICIENT_BALANCE');
   });
 
-  it('기한(직전 영업일 17:00:00)이 지나면 REQUEST_DEADLINE_PASSED', async () => {
-    clock.at('2026-11-12', '17:00:01');
-    expect(
-      await codeOf(
-        useCase.execute({
-          ip: '127.0.0.1',
-          user: KIM,
-          input: annual('2026-11-13'),
-        }),
-      ),
-    ).toBe('REQUEST_DEADLINE_PASSED');
+  describe('기한 후 예외 신청 (ATT-36, 결정 A22)', () => {
+    it('기한 안 신청은 일반 신청이다', async () => {
+      const r = await useCase.execute({
+        ip: '127.0.0.1',
+        user: KIM,
+        input: annual('2026-11-13'),
+      });
+      expect(r.isAfterDeadline).toBe(false);
+    });
+
+    it('기한(직전 영업일 17:00:00)이 지나도 사유가 있으면 예외 신청으로 대기 접수하고 잔여를 차감한다', async () => {
+      clock.at('2026-11-12', '17:00:01');
+      const r = await useCase.execute({
+        ip: '127.0.0.1',
+        user: KIM,
+        input: { ...annual('2026-11-13'), reason: '조부상' },
+      });
+      expect(r).toMatchObject({ isAfterDeadline: true, status: 'PENDING' });
+      expect(await annualDays()).toBe(9);
+    });
+
+    it('기한 후 신청에 사유가 없으면 LATE_REASON_REQUIRED', async () => {
+      clock.at('2026-11-12', '17:00:01');
+      expect(
+        await codeOf(
+          useCase.execute({
+            ip: '127.0.0.1',
+            user: KIM,
+            input: annual('2026-11-13'),
+          }),
+        ),
+      ).toBe('LATE_REASON_REQUIRED');
+    });
+
+    it('공백만 있는 사유는 사유가 없는 것으로 본다', async () => {
+      clock.at('2026-11-12', '17:00:01');
+      expect(
+        await codeOf(
+          useCase.execute({
+            ip: '127.0.0.1',
+            user: KIM,
+            input: { ...annual('2026-11-13'), reason: '   ' },
+          }),
+        ),
+      ).toBe('LATE_REASON_REQUIRED');
+    });
+
+    it('오늘 날짜는 예외 신청으로도 받지 않는다 (PAST_DATE_REQUEST)', async () => {
+      clock.at('2026-11-13', '08:00:00');
+      expect(
+        await codeOf(
+          useCase.execute({
+            ip: '127.0.0.1',
+            user: KIM,
+            input: { ...annual('2026-11-13'), reason: '몸살' },
+          }),
+        ),
+      ).toBe('PAST_DATE_REQUEST');
+    });
+
+    it('리드 본인의 기한 후 신청은 자동 승인된다 (예외 표시는 남음)', async () => {
+      clock.at('2026-11-12', '18:00:00');
+      const r = await useCase.execute({
+        ip: '127.0.0.1',
+        user: LEAD,
+        input: { ...annual('2026-11-13'), reason: '가족 행사' },
+      });
+      expect(r).toMatchObject({ isAfterDeadline: true, status: 'APPROVED' });
+    });
   });
 
   it('이미 살아 있는 신청과 날짜가 겹치면 OVERLAPPING_REQUEST', async () => {
@@ -362,6 +420,7 @@ describe('CreateRequestUseCase', () => {
       payload: expect.objectContaining({
         autoApproved: true,
         isOverLimit: false,
+        isAfterDeadline: false,
       }) as unknown,
     });
   });
