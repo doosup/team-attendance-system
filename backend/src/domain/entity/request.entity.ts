@@ -27,6 +27,7 @@ export interface RequestProps {
   endDate: string;
   status: RequestStatus;
   isOverLimit: boolean;
+  isAfterDeadline: boolean; // 기한 후 예외 신청 (사유 필수, 리드 승인, A22)
   reason: string;
   ip: string | null;
   halfOffPart: HalfOffPart | null; // 반일 OFF 오전/오후 (표시용, ATT-34)
@@ -50,6 +51,7 @@ export class Request {
       | 'startDate'
       | 'endDate'
       | 'isOverLimit'
+      | 'isAfterDeadline'
       | 'reason'
       | 'ip'
       | 'halfOffPart'

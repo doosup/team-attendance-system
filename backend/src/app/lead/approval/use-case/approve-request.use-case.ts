@@ -38,6 +38,7 @@ export class ApproveRequestUseCase implements UseCase<Input, RequestResult> {
         startDate: request.props.startDate,
         endDate: request.props.endDate,
         isOverLimit: request.props.isOverLimit,
+        isAfterDeadline: request.props.isAfterDeadline,
       },
       ip,
       occurredAt: now,

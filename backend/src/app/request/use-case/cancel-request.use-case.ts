@@ -32,9 +32,12 @@ export class CancelRequestUseCase implements UseCase<Input, RequestResult> {
     if (!request || request.props.userId !== user.id) {
       throw new CustomException('REQUEST_NOT_FOUND');
     }
-    const { startDate, endDate } = request.props;
-    if (now > deadlineOf(startDate)) {
-      const today = workDateOf(now);
+    const { startDate, endDate, isAfterDeadline, status } = request.props;
+    const today = workDateOf(now);
+    // 기한 후 예외 신청은 리드 결정 전·시작 전이면 철회 가능: 기한 안 취소와 마찬가지로 팀에 손해 없음 (A22)
+    const withdrawable =
+      isAfterDeadline && status === 'PENDING' && startDate > today;
+    if (now > deadlineOf(startDate) && !withdrawable) {
       const inProgress = startDate <= today && today <= endDate;
       throw new CustomException(
         inProgress ? 'SAME_DAY_CANCEL_LEAD_ONLY' : 'REQUEST_DEADLINE_PASSED',

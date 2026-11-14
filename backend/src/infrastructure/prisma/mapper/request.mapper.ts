@@ -14,6 +14,7 @@ export const RequestMapper = {
       endDate: m.endDate,
       status: m.status,
       isOverLimit: m.isOverLimit,
+      isAfterDeadline: m.isAfterDeadline,
       reason: m.reason,
       ip: m.ip,
       halfOffPart: m.halfOffPart,

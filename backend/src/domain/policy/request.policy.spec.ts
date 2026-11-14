@@ -1,7 +1,8 @@
 import { kstAt } from '../value/work-date';
 import {
-  assertBeforeDeadline,
+  assertNotStarted,
   datesForRequest,
+  isAfterDeadline,
   isRemoteOverLimit,
 } from './request.policy';
 
@@ -78,42 +79,58 @@ describe('신청 날짜 datesForRequest', () => {
   });
 });
 
-describe('신청 기한 assertBeforeDeadline (시작일의 직전 영업일 17:00:00까지)', () => {
-  it('월요일 연차는 금요일 17:00:00까지 된다', () => {
-    expect(
-      codeOf(() =>
-        assertBeforeDeadline(kstAt('2026-11-13', '17:00:00'), '2026-11-16'),
-      ),
-    ).toBe('OK');
+describe('신청 기한 isAfterDeadline (시작일의 직전 영업일 17:00:00까지)', () => {
+  it('월요일 연차는 금요일 17:00:00까지 기한 안이다', () => {
+    expect(isAfterDeadline(kstAt('2026-11-13', '17:00:00'), '2026-11-16')).toBe(
+      false,
+    );
   });
 
-  it('금요일 17:00:01부터는 REQUEST_DEADLINE_PASSED', () => {
-    expect(
-      codeOf(() =>
-        assertBeforeDeadline(kstAt('2026-11-13', '17:00:01'), '2026-11-16'),
-      ),
-    ).toBe('REQUEST_DEADLINE_PASSED');
+  it('금요일 17:00:01부터는 기한 후다', () => {
+    expect(isAfterDeadline(kstAt('2026-11-13', '17:00:01'), '2026-11-16')).toBe(
+      true,
+    );
   });
 
   it('설 연휴 다음 날(2/19) 신청은 연휴 전 영업일(2/13) 17:00까지', () => {
-    expect(
-      codeOf(() =>
-        assertBeforeDeadline(kstAt('2026-02-16', '09:00:00'), '2026-02-19'),
-      ),
-    ).toBe('REQUEST_DEADLINE_PASSED');
-    expect(
-      codeOf(() =>
-        assertBeforeDeadline(kstAt('2026-02-13', '16:59:59'), '2026-02-19'),
-      ),
-    ).toBe('OK');
+    expect(isAfterDeadline(kstAt('2026-02-16', '09:00:00'), '2026-02-19')).toBe(
+      true,
+    );
+    expect(isAfterDeadline(kstAt('2026-02-13', '16:59:59'), '2026-02-19')).toBe(
+      false,
+    );
   });
 
   it('토요일 주말 근무는 금요일 17:00까지', () => {
+    expect(isAfterDeadline(kstAt('2026-11-13', '17:00:01'), '2026-11-14')).toBe(
+      true,
+    );
+  });
+});
+
+describe('오늘·지난 날짜 신청 assertNotStarted (기한 후 예외 신청도 내일부터, A22)', () => {
+  it('오늘 날짜는 PAST_DATE_REQUEST', () => {
     expect(
       codeOf(() =>
-        assertBeforeDeadline(kstAt('2026-11-13', '17:00:01'), '2026-11-14'),
+        assertNotStarted(kstAt('2026-11-13', '08:00:00'), '2026-11-13'),
       ),
-    ).toBe('REQUEST_DEADLINE_PASSED');
+    ).toBe('PAST_DATE_REQUEST');
+  });
+
+  it('어제 날짜(소급)는 PAST_DATE_REQUEST', () => {
+    expect(
+      codeOf(() =>
+        assertNotStarted(kstAt('2026-11-13', '08:00:00'), '2026-11-12'),
+      ),
+    ).toBe('PAST_DATE_REQUEST');
+  });
+
+  it('내일 날짜는 23:59:59에도 신청할 수 있다', () => {
+    expect(
+      codeOf(() =>
+        assertNotStarted(kstAt('2026-11-13', '23:59:59'), '2026-11-14'),
+      ),
+    ).toBe('OK');
   });
 });
 

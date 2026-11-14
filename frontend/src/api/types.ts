@@ -91,6 +91,7 @@ export interface LeaveRequest {
   endDate: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
   isOverLimit: boolean;
+  isAfterDeadline: boolean; // 기한 후 예외 신청
   reason: string;
   ip: string | null;
   halfOffPart: HalfOffPart | null;
