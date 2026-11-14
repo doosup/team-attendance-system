@@ -136,6 +136,32 @@ export class Request {
     return day.id;
   }
 
+  /**
+   * 퇴사 처리 (결정 A20): 승인된 신청은 내일 이후 날짜만, 대기 신청은 효력이 없으므로 전부 취소.
+   * 남은 날이 없으면 신청서도 취소
+   */
+  cancelForRetirement(leadId: number, today: string, now: Date): number[] {
+    const pending = this.props.status === 'PENDING';
+    const canceled = this.props.days.filter(
+      (d) => d.status === 'ACTIVE' && (pending || d.date > today),
+    );
+    for (const d of canceled) {
+      Object.assign(d, {
+        status: 'CANCELED',
+        cancelType: 'RETIREMENT',
+        canceledById: leadId,
+        canceledAt: now,
+      });
+    }
+    if (
+      canceled.length > 0 &&
+      this.props.days.every((d) => d.status === 'CANCELED')
+    ) {
+      this.props.status = 'CANCELED';
+    }
+    return canceled.flatMap((d) => (d.id === null ? [] : [d.id]));
+  }
+
   get dayIds(): number[] {
     return this.props.days.flatMap((d) => (d.id === null ? [] : [d.id]));
   }

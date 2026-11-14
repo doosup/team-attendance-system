@@ -12,7 +12,9 @@ export type AuditAction =
   | 'IP_BLOCKED'
   | 'ALLOWED_IP_ADD'
   | 'ALLOWED_IP_DELETE'
-  | 'CLOCK_CHANGE';
+  | 'CLOCK_CHANGE'
+  | 'USER_CREATE'
+  | 'USER_RETIRE';
 
 // 이력 한 줄 (추가 전용). 비밀번호·토큰은 payload에 넣지 않는다.
 export interface AuditDraft {

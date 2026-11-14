@@ -1,6 +1,7 @@
 import { Transactional } from '@nestjs-cls/transactional';
 import { Injectable } from '@nestjs/common';
 import {
+  employedIn,
   settleMonth,
   settlementDateOf,
 } from '../../../../domain/policy/settlement.policy';
@@ -39,13 +40,23 @@ export class GetMonthlySettlementUseCase implements UseCase<
 
     // shortcut: 사람마다 쿼리 3번(N+1), 팀 4명이라 충분. 인원이 늘면 월 단위 일괄 조회로
     const rows: SettlementRow[] = [];
-    for (const user of await this.users.findAll()) {
+    // 그 달에 재직한 날이 있는 사람만, 퇴사자 포함 (결정 A20)
+    const members = (await this.users.findAllIncludingRetired()).filter((u) =>
+      employedIn(target, u.joinDate, u.retiredAt && workDateOf(u.retiredAt)),
+    );
+    for (const user of members) {
       // 트랜잭션 클라이언트 하나를 쓰므로 병렬이 아니라 차례로
       const attendances = await this.attendances.findByUserAndMonth(
         user.id,
         target,
       );
-      const entries = await syncLedger(this.ledger, user, today);
+      const retiredDate = user.retiredAt && workDateOf(user.retiredAt);
+      // 원장은 추가 전용이라 퇴사자는 퇴사일까지만 채운다 (퇴사 뒤 적립이 영구히 남지 않게)
+      const entries = await syncLedger(
+        this.ledger,
+        user,
+        retiredDate && retiredDate < today ? retiredDate : today,
+      );
       const remote = await this.requestDays.countRemoteDays(user.id, target);
       const { asOf: _asOf, ...s } = settleMonth(
         target,
@@ -56,6 +67,7 @@ export class GetMonthlySettlementUseCase implements UseCase<
       rows.push({
         userId: user.id,
         name: user.name,
+        retiredDate,
         ...s,
         remote: { used: remote.normal, exceptions: remote.overLimit },
       });

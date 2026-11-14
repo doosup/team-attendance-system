@@ -24,8 +24,10 @@ export class GetTeamMissingUseCase implements UseCase<
       (await this.users.findAll()).map((u) => [u.id, u.name]),
     );
     const rows = await this.attendances.findMissingOrManual(today);
-    return rows.map((a) =>
-      MissingCheckoutResult.from(a, names.get(a.props.userId) ?? null),
-    );
+    // 퇴사자 건은 본인이 더 입력할 수 없어 목록에서 뺀다 (결정 A20)
+    return rows.flatMap((a) => {
+      const name = names.get(a.props.userId);
+      return name === undefined ? [] : [MissingCheckoutResult.from(a, name)];
+    });
   }
 }

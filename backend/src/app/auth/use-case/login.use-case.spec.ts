@@ -1,3 +1,4 @@
+import { kstAt } from '../../../domain/value/work-date';
 import { InMemoryAuditLogRepository } from '../../../../test/fakes/in-memory-audit-log.repository';
 import { FixedClock } from '../../../../test/fakes/fixed-clock';
 import { CustomException } from '../../../domain/exception/custom.exception';
@@ -80,7 +81,7 @@ describe('LoginUseCase', () => {
   });
 
   it('퇴사(소프트 삭제)한 사용자는 로그인할 수 없다', async () => {
-    users.softDelete(KIM.id);
+    await users.retire(KIM.id, kstAt('2026-11-12', '18:00:00'));
     expect(
       await codeOf(
         useCase.execute({

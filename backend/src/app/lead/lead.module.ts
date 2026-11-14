@@ -20,6 +20,12 @@ import { GetAuditLogsController } from './audit-log/controller/get-audit-logs.co
 import { GetAuditLogsUseCase } from './audit-log/use-case/get-audit-logs.use-case';
 import { GetUserLedgerController } from './balance/controller/get-user-ledger.controller';
 import { GetUserLedgerUseCase } from './balance/use-case/get-user-ledger.use-case';
+import { GetMembersController } from './member/controller/get-members.controller';
+import { RegisterMemberController } from './member/controller/register-member.controller';
+import { RetireMemberController } from './member/controller/retire-member.controller';
+import { GetMembersUseCase } from './member/use-case/get-members.use-case';
+import { RegisterMemberUseCase } from './member/use-case/register-member.use-case';
+import { RetireMemberUseCase } from './member/use-case/retire-member.use-case';
 import { GetMonthlySettlementController } from './settlement/controller/get-monthly-settlement.controller';
 import { GetMonthlySettlementUseCase } from './settlement/use-case/get-monthly-settlement.use-case';
 
@@ -38,6 +44,9 @@ import { GetMonthlySettlementUseCase } from './settlement/use-case/get-monthly-s
     DeleteAllowedIpController,
     GetTeamMissingController,
     GetMonthlySettlementController,
+    GetMembersController,
+    RegisterMemberController,
+    RetireMemberController,
   ],
   providers: [
     GetUserLedgerUseCase,
@@ -51,6 +60,9 @@ import { GetMonthlySettlementUseCase } from './settlement/use-case/get-monthly-s
     DeleteAllowedIpUseCase,
     GetTeamMissingUseCase,
     GetMonthlySettlementUseCase,
+    GetMembersUseCase,
+    RegisterMemberUseCase,
+    RetireMemberUseCase,
   ],
 })
 export class LeadModule {}

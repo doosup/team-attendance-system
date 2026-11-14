@@ -132,3 +132,75 @@ describe('Request 취소', () => {
     );
   });
 });
+
+describe('Request 퇴사 처리 자동 취소', () => {
+  // 11/13(금)~11/17(화) 연차: 영업일 11/13, 11/16, 11/17
+  const spanning = (status: 'PENDING' | 'APPROVED' = 'APPROVED') => {
+    const r = Request.submit(
+      {
+        type: 'ANNUAL',
+        startDate: '2026-11-13',
+        endDate: '2026-11-17',
+        isOverLimit: false,
+        reason: '',
+        ip: null,
+        startTime: null,
+        endTime: null,
+      },
+      KIM,
+      ['2026-11-13', '2026-11-16', '2026-11-17'],
+      NOW,
+    );
+    return new Request({
+      ...r.props,
+      id: 1,
+      status,
+      days: r.props.days.map((d, i) => ({ ...d, id: 10 + i })),
+    });
+  };
+
+  it('내일 이후의 살아 있는 날짜만 RETIREMENT로 취소하고 그 id를 돌려준다', () => {
+    const r = spanning();
+
+    const ids = r.cancelForRetirement(LEAD.id, '2026-11-13', NOW);
+
+    expect(ids).toEqual([11, 12]);
+    expect(r.props.days.map((d) => [d.date, d.status, d.cancelType])).toEqual([
+      ['2026-11-13', 'ACTIVE', null],
+      ['2026-11-16', 'CANCELED', 'RETIREMENT'],
+      ['2026-11-17', 'CANCELED', 'RETIREMENT'],
+    ]);
+    expect(r.props.days[1]).toMatchObject({
+      canceledById: LEAD.id,
+      canceledAt: NOW,
+    });
+  });
+
+  it('오늘·지난 날짜가 남으면 신청서 상태는 그대로다', () => {
+    const r = spanning();
+    r.cancelForRetirement(LEAD.id, '2026-11-13', NOW);
+    expect(r.props.status).toBe('APPROVED');
+  });
+
+  it('모든 날짜가 내일 이후면 신청서도 CANCELED가 된다', () => {
+    const r = spanning('PENDING');
+    expect(r.cancelForRetirement(LEAD.id, '2026-11-12', NOW)).toEqual([
+      10, 11, 12,
+    ]);
+    expect(r.props.status).toBe('CANCELED');
+  });
+
+  it('승인 전(대기) 신청은 효력이 없으므로 오늘·지난 날짜까지 모두 취소한다', () => {
+    const r = spanning('PENDING');
+    expect(r.cancelForRetirement(LEAD.id, '2026-11-16', NOW)).toEqual([
+      10, 11, 12,
+    ]);
+    expect(r.props.status).toBe('CANCELED');
+  });
+
+  it('이미 끝난 신청은 아무것도 바꾸지 않는다', () => {
+    const r = spanning();
+    expect(r.cancelForRetirement(LEAD.id, '2026-11-17', NOW)).toEqual([]);
+    expect(r.props.status).toBe('APPROVED');
+  });
+});

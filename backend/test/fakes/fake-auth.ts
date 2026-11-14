@@ -4,6 +4,10 @@ import { TokenPort } from '../../src/domain/port/token.port';
 export class FakePasswordHasher extends PasswordHasher {
   readonly calls: (string | null)[] = [];
 
+  hash(plain: string) {
+    return Promise.resolve(`hash:${plain}`);
+  }
+
   verify(plain: string, hash: string | null) {
     this.calls.push(hash);
     return Promise.resolve(hash === `hash:${plain}`);

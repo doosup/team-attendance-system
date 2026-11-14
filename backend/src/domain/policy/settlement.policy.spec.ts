@@ -1,7 +1,7 @@
 import { Attendance } from '../entity/attendance.entity';
 import { LedgerEntry, LedgerEntryProps } from '../entity/ledger-entry.entity';
 import { kstAt } from '../value/work-date';
-import { settleMonth, settlementDateOf } from './settlement.policy';
+import { employedIn, settleMonth, settlementDateOf } from './settlement.policy';
 
 const attendance = (
   workDate: string,
@@ -57,6 +57,26 @@ describe('정산 기준일 settlementDateOf', () => {
 
   it('2월 말일도 맞게 계산한다', () => {
     expect(settlementDateOf('2026-02', '2026-11-13')).toBe('2026-02-28');
+  });
+});
+
+describe('그 달 재직 여부 employedIn (결정 A20)', () => {
+  it('입사일이 그 달 말일 이전이고 퇴사하지 않았으면 재직이다', () => {
+    expect(employedIn('2026-10', '2026-01-01', null)).toBe(true);
+    expect(employedIn('2026-02', '2026-02-28', null)).toBe(true);
+  });
+
+  it('입사 전 달은 재직이 아니다', () => {
+    expect(employedIn('2026-01', '2026-02-12', null)).toBe(false);
+  });
+
+  it('퇴사일이 그 달 1일 이후면 그 달은 재직이다 (1일 퇴사 포함)', () => {
+    expect(employedIn('2026-10', '2026-01-01', '2026-10-01')).toBe(true);
+    expect(employedIn('2026-10', '2026-01-01', '2026-10-31')).toBe(true);
+  });
+
+  it('퇴사한 다음 달부터는 재직이 아니다', () => {
+    expect(employedIn('2026-11', '2026-01-01', '2026-10-31')).toBe(false);
   });
 });
 
