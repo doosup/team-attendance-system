@@ -210,3 +210,84 @@ describe('Request 퇴사 처리 자동 취소', () => {
     expect(r.props.status).toBe('APPROVED');
   });
 });
+
+describe('Request.changeAccess (리드의 IP·시간대 변경, A23)', () => {
+  const weekend = (dates = ['2026-11-21']) => {
+    const r = Request.submit(
+      {
+        type: 'WEEKEND_WORK',
+        startDate: dates[0],
+        endDate: dates.at(-1)!,
+        isOverLimit: false,
+        isAfterDeadline: false,
+        reason: '',
+        ip: '10.0.0.7',
+        halfOffPart: null,
+        startTime: '09:00',
+        endTime: '18:00',
+      },
+      KIM,
+      dates,
+      NOW,
+    );
+    return new Request({
+      ...r.props,
+      id: 1,
+      days: r.props.days.map((d, i) => ({ ...d, id: i + 1 })),
+    });
+  };
+  const access = { ip: '10.0.0.8', startTime: '09:00', endTime: '18:00' };
+
+  it('대기 중인 주말 근무도 바꿀 수 있고, 누가·언제·왜를 남긴다', () => {
+    const r = weekend();
+    const before = r.changeAccess(LEAD.id, access, '오타', '2026-11-20', NOW);
+    expect(before).toEqual({
+      ip: '10.0.0.7',
+      startTime: '09:00',
+      endTime: '18:00',
+    });
+    expect(r.props).toMatchObject({
+      ip: '10.0.0.8',
+      accessChangedById: LEAD.id,
+      accessChangedAt: NOW,
+      accessChangeReason: '오타',
+    });
+  });
+
+  it('남은 날이 오늘뿐인데 그날이 취소됐으면 ACCESS_CHANGE_NOT_ALLOWED', () => {
+    const r = weekend();
+    r.approve(LEAD.id, NOW);
+    r.cancelDay('2026-11-21', LEAD.id, '취소', NOW);
+    expect(
+      codeOf(() => r.changeAccess(LEAD.id, access, '오타', '2026-11-21', NOW)),
+    ).toBe('ACCESS_CHANGE_NOT_ALLOWED');
+  });
+
+  it('시작과 종료가 같으면 VALIDATION_FAILED', () => {
+    expect(
+      codeOf(() =>
+        weekend().changeAccess(
+          LEAD.id,
+          { ip: '10.0.0.8', startTime: '09:00', endTime: '09:00' },
+          '오타',
+          '2026-11-20',
+          NOW,
+        ),
+      ),
+    ).toBe('VALIDATION_FAILED');
+  });
+
+  it('바뀐 것이 없으면 VALIDATION_FAILED (변경 표시·이력을 남기지 않음)', () => {
+    expect(
+      codeOf(() =>
+        weekend().changeAccess(
+          LEAD.id,
+          { ip: '10.0.0.7', startTime: '09:00', endTime: '18:00' },
+          '확인',
+          '2026-11-20',
+          NOW,
+        ),
+      ),
+    ).toBe('VALIDATION_FAILED');
+  });
+});

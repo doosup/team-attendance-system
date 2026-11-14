@@ -25,6 +25,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   CLOCK_CHANGE: '현재 시각 변경',
   USER_CREATE: '팀원 등록',
   USER_RETIRE: '퇴사 처리',
+  REQUEST_ACCESS_CHANGE: '접속 IP 변경',
 };
 
 const s = (v: unknown) => (v == null ? '' : String(v));
@@ -97,6 +98,16 @@ export function describeLog(
         `사유: ${s(p.rejectReason)}`,
         restored(p),
       );
+    case 'REQUEST_ACCESS_CHANGE': {
+      const access = (v: unknown) => {
+        const a = (v ?? {}) as Record<string, unknown>;
+        return `${s(a.ip)} ${s(a.startTime)}~${s(a.endTime)}`;
+      };
+      return join(
+        `${nameOf(p.applicantId)}님 ${kind(p)} ${period(p)} 접속 정보 변경: ${access(p.before)} → ${access(p.after)}`,
+        `사유: ${s(p.reason)}`,
+      );
+    }
     case 'LOGIN':
       return `아이디 ${s(p.loginId)}`;
     case 'LOGIN_FAIL':

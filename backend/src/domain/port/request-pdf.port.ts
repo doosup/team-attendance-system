@@ -26,6 +26,7 @@ export interface RequestDocument {
   halfOffPart: 'AM' | 'PM' | null;
   startTime: string | null;
   endTime: string | null;
+  accessChangeReason: string | null; // 리드가 IP·시간대를 바꿨으면 사유 (A23)
   deciderName: string | null;
   decidedAt: Date | null;
   rejectReason: string | null;

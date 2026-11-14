@@ -123,7 +123,10 @@ export class PdfkitRequestPdfRenderer extends RequestPdfRenderer {
     if (d.ip)
       row(
         '접속 IP · 시간대',
-        `${d.ip} · ${d.startTime ?? ''} ~ ${d.endTime ?? ''}`,
+        `${d.ip} · ${d.startTime ?? ''} ~ ${d.endTime ?? ''}` +
+          (d.accessChangeReason
+            ? `\n(리드 변경: ${d.accessChangeReason})`
+            : ''),
       );
     else if (d.type === 'HALF_OFF' && (d.halfOffPart || d.startTime))
       // 반일 OFF: 언제 쉬는지 (ATT-34). 판정은 실제 근무 4시간 기준

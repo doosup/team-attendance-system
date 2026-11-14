@@ -39,6 +39,10 @@ export class InMemoryRequestRepository extends RequestRepository {
     return Promise.resolve();
   }
 
+  saveAccess(request: Request) {
+    return this.save(request);
+  }
+
   findByUser(userId: number, includeCanceled: boolean) {
     return Promise.resolve(
       this.rows

@@ -31,6 +31,7 @@ describe('PdfkitRequestPdfRenderer', () => {
       halfOffPart: null,
       startTime: null,
       endTime: null,
+      accessChangeReason: null,
       deciderName: '이리드',
       decidedAt: kstAt('2026-11-18', '11:00:00'),
       rejectReason: null,

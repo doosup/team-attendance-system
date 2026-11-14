@@ -233,6 +233,44 @@ describe('핵심 흐름 (e2e)', () => {
     });
   });
 
+  it('리드가 재택 IP를 바꾸면 새 IP는 바로 허용되고 예전 IP는 막힌다 (A23)', async () => {
+    await setClock('2026-12-01', '09:00:00'); // 화
+    const created = await as('kim')
+      .post('/requests', {
+        type: 'REMOTE',
+        startDate: '2026-12-03',
+        endDate: '2026-12-03',
+        reason: '',
+        ip: '10.0.0.7',
+        startTime: '09:00',
+        endTime: '18:00',
+      })
+      .expect(201);
+    const id = created.body.data.id as number;
+    await as('lead').post(`/lead/requests/${id}/approve`).expect(200);
+    const changed = await as('lead')
+      .post(`/lead/requests/${id}/access`, {
+        ip: '10.0.0.8',
+        startTime: '09:00',
+        endTime: '18:00',
+        reason: 'IP 오타',
+      })
+      .expect(200);
+    expect(changed.body.data).toMatchObject({
+      ip: '10.0.0.8',
+      accessChangeReason: 'IP 오타',
+    });
+
+    await setClock('2026-12-03', '10:00:00');
+    const today = (forwardedFor: string) =>
+      request(http)
+        .get('/attendance/today')
+        .set('authorization', `Bearer ${tokens.kim}`)
+        .set('x-forwarded-for', forwardedFor);
+    await today('10.0.0.8').expect(200);
+    await today('10.0.0.7').expect(403);
+  });
+
   it('팀원이 리드 API를 부르면 403 FORBIDDEN_ROLE', async () => {
     const res = await as('kim').get('/lead/requests').expect(403);
     expect(res.body.error.code).toBe('FORBIDDEN_ROLE');

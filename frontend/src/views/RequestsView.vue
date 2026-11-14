@@ -5,7 +5,7 @@ import '@vuepic/vue-datepicker/dist/main.css';
 import { ko } from 'date-fns/locale';
 import { api, ApiError, download } from '@/api/client';
 import type { Balance, Holiday, LeaveRequest, RequestType } from '@/api/types';
-import { REQUEST_STATUS, REQUEST_TYPE } from '@/format';
+import { kstDateTime, REQUEST_STATUS, REQUEST_TYPE } from '@/format';
 import { useClockStore } from '@/stores/clock';
 
 // 신청서 (FN-REQ-01). 쉬는 신청(휴가)과 일하는 방식 신청(근무)을 탭으로 나눈다 (ATT-33)
@@ -369,6 +369,13 @@ async function pdf(r: LeaveRequest) {
             {{ REQUEST_TYPE[r.type] }}
             <span v-if="r.isOverLimit" class="tag warn">한도 초과</span>
             <span v-if="r.isAfterDeadline" class="tag warn">기한 후</span>
+            <div v-if="r.ip" class="muted">
+              IP {{ r.ip }} · {{ r.startTime }}~{{ r.endTime }}
+            </div>
+            <div v-if="r.accessChangedAt" class="muted">
+              <span class="tag">리드 변경</span>
+              {{ kstDateTime(r.accessChangedAt) }} · {{ r.accessChangeReason }}
+            </div>
           </td>
           <td>
             {{ r.startDate

@@ -9,6 +9,8 @@ export abstract class RequestRepository {
   abstract findByStatus(status: RequestStatus): Promise<Request[]>;
   // 신청서 상태·결정 정보와 날짜 행 상태를 저장
   abstract save(request: Request): Promise<void>;
+  // 접속 IP·시간대와 리드 변경 기록만 저장 (A23). save()와 나눠 다른 저장이 예전 IP를 덮어쓰지 않게
+  abstract saveAccess(request: Request): Promise<void>;
   // 시작일 최신순. includeCanceled=false면 CANCELED 제외
   abstract findByUser(
     userId: number,

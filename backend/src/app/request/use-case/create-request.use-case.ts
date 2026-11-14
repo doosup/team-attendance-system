@@ -8,6 +8,7 @@ import { CustomException } from '../../../domain/exception/custom.exception';
 import { balanceOf, pickOffGrant } from '../../../domain/policy/balance.policy';
 import {
   assertNotStarted,
+  assertTimeWindow,
   datesForRequest,
   isAfterDeadline,
   isRemoteOverLimit,
@@ -145,12 +146,7 @@ export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
       return { ...none, halfOffPart };
     }
     const { startTime = '', endTime = '' } = input;
-    if (startTime >= endTime) {
-      throw new CustomException(
-        'VALIDATION_FAILED',
-        'startTime은 endTime보다 일러야 합니다',
-      );
-    }
+    assertTimeWindow(startTime, endTime);
     if (input.type === 'HALF_OFF') {
       return { ip: null, halfOffPart, startTime, endTime };
     }

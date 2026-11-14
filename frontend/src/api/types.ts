@@ -98,6 +98,8 @@ export interface LeaveRequest {
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
   isOverLimit: boolean;
   isAfterDeadline: boolean; // 기한 후 예외 신청
+  accessChangedAt: string | null; // 리드가 IP·시간대를 바꿨으면 그 시각 (A23)
+  accessChangeReason: string | null;
   reason: string;
   ip: string | null;
   halfOffPart: HalfOffPart | null;
@@ -141,7 +143,8 @@ export type AuditAction =
   | 'ALLOWED_IP_DELETE'
   | 'CLOCK_CHANGE'
   | 'USER_CREATE'
-  | 'USER_RETIRE';
+  | 'USER_RETIRE'
+  | 'REQUEST_ACCESS_CHANGE';
 
 export interface AuditLog {
   id: number;

@@ -23,6 +23,9 @@ export const RequestMapper = {
       decidedById: m.decidedById,
       decidedAt: m.decidedAt,
       rejectReason: m.rejectReason,
+      accessChangedAt: m.accessChangedAt,
+      accessChangedById: m.accessChangedById,
+      accessChangeReason: m.accessChangeReason,
       days: [...m.days]
         .sort((a, b) => a.date.localeCompare(b.date))
         .map((d) => ({

@@ -58,6 +58,7 @@ export class GetRequestPdfUseCase implements UseCase<Input, Buffer> {
       halfOffPart: p.halfOffPart,
       startTime: p.startTime,
       endTime: p.endTime,
+      accessChangeReason: p.accessChangeReason,
       deciderName,
       decidedAt: p.decidedAt,
       rejectReason: p.rejectReason,
