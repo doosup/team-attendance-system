@@ -113,4 +113,13 @@ describe('신청서 PDF', () => {
       getPdf.execute({ user: LEAD, requestId: 999 }),
     ).rejects.toThrow(new CustomException('REQUEST_NOT_FOUND'));
   });
+
+  it('퇴사한 신청자의 신청서도 이름이 그대로 나온다', async () => {
+    const { id } = await annual();
+    await users.retire(KIM.id, kstAt('2026-11-12', '18:00:00'));
+
+    await getPdf.execute({ user: LEAD, requestId: id });
+
+    expect(renderer.last?.applicantName).toBe('김근태');
+  });
 });

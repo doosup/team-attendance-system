@@ -2,6 +2,15 @@ import { Attendance } from '../entity/attendance.entity';
 import { LedgerEntry } from '../entity/ledger-entry.entity';
 import { lastDayOfMonth } from '../value/work-date';
 
+/** 그 달에 재직한 날이 있나: 입사일 ≤ 말일, 퇴사일(KST 날짜) ≥ 1일 (결정 A20) */
+export const employedIn = (
+  month: string,
+  joinDate: string,
+  retiredDate: string | null,
+): boolean =>
+  joinDate <= lastDayOfMonth(month) &&
+  (retiredDate === null || retiredDate >= `${month}-01`);
+
 export interface MonthlySettlement {
   asOf: string; // 잔여 기준일
   workDays: number; // 출근 기록이 있는 날

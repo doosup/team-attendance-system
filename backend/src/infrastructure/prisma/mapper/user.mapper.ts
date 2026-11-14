@@ -10,6 +10,7 @@ export const UserMapper = {
       m.name,
       m.role,
       m.joinDate,
+      m.deletedAt,
     );
   },
 };

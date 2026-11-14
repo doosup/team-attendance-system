@@ -5,6 +5,7 @@ import type {
   AllowedIp,
   AuditLog,
   LeaveRequest,
+  Member,
   MissingCheckout,
 } from '@/api/types';
 import { kstDateTime, kstTime, REQUEST_TYPE } from '@/format';
@@ -17,6 +18,13 @@ const pending = ref<LeaveRequest[]>([]);
 const approved = ref<LeaveRequest[]>([]);
 const missing = ref<MissingCheckout[]>([]);
 const ips = ref<AllowedIp[]>([]);
+const members = ref<Member[]>([]);
+const newMember = reactive({
+  loginId: '',
+  password: '',
+  name: '',
+  joinDate: '',
+});
 const logs = ref<AuditLog[]>([]);
 const newIp = reactive({ ip: '', label: '' });
 const logFilter = reactive({ userId: '', from: '', to: '' });
@@ -40,12 +48,13 @@ async function loadLogs() {
 
 async function load() {
   await guard(async () => {
-    [pending.value, approved.value, missing.value, ips.value] =
+    [pending.value, approved.value, missing.value, ips.value, members.value] =
       await Promise.all([
         api<LeaveRequest[]>('GET', '/lead/requests?status=PENDING'),
         api<LeaveRequest[]>('GET', '/lead/requests?status=APPROVED'),
         api<MissingCheckout[]>('GET', '/lead/missing-checkouts'),
         api<AllowedIp[]>('GET', '/lead/allowed-ips'),
+        api<Member[]>('GET', '/lead/users'),
       ]);
     await loadLogs();
   });
@@ -97,6 +106,32 @@ const deleteIp = (ip: AllowedIp) =>
   guard(async () => {
     if (!confirm(`${ip.ip} (${ip.label})를 삭제할까요?`)) return;
     await api('DELETE', `/lead/allowed-ips/${ip.id}`);
+    await load();
+  });
+
+// 회원가입 대신 리드가 팀원을 등록한다 (결정 A19)
+const registerMember = () =>
+  guard(async () => {
+    await api('POST', '/lead/users', newMember);
+    Object.assign(newMember, {
+      loginId: '',
+      password: '',
+      name: '',
+      joinDate: '',
+    });
+    await load();
+  });
+
+// 퇴사 처리 = 소프트 삭제. 기록은 남고 내일 이후 신청은 자동 취소 (결정 A20)
+const retireMember = (m: Member) =>
+  guard(async () => {
+    if (
+      !confirm(
+        `${m.name}(${m.loginId})님을 퇴사 처리할까요?\n기록은 남고, 로그인과 팀 목록에서 빠지며 내일 이후 신청은 자동 취소됩니다.`,
+      )
+    )
+      return;
+    await api('DELETE', `/lead/users/${m.id}`);
     await load();
   });
 
@@ -184,6 +219,77 @@ const period = (r: LeaveRequest) =>
   </section>
 
   <SettlementPanel />
+
+  <section class="card">
+    <h2>팀원</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>이름</th>
+          <th>아이디</th>
+          <th>입사일</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="m in members" :key="m.id">
+          <td>
+            {{ m.name }}
+            <span v-if="m.role === 'LEAD'" class="tag">리드</span>
+          </td>
+          <td>{{ m.loginId }}</td>
+          <td>{{ m.joinDate }}</td>
+          <td>
+            <button
+              v-if="m.role === 'MEMBER'"
+              class="danger"
+              @click="retireMember(m)"
+            >
+              퇴사 처리
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <form class="row" style="margin-top: 12px" @submit.prevent="registerMember">
+      <input
+        v-model="newMember.name"
+        placeholder="이름"
+        aria-label="이름"
+        required
+      />
+      <input
+        v-model="newMember.loginId"
+        placeholder="아이디 (영문 소문자·숫자 3~20자)"
+        aria-label="아이디"
+        pattern="[a-z0-9]{3,20}"
+        required
+      />
+      <input
+        v-model="newMember.password"
+        type="password"
+        placeholder="초기 비밀번호 (8자 이상)"
+        aria-label="초기 비밀번호"
+        minlength="8"
+        autocomplete="new-password"
+        required
+      />
+      <label>
+        입사일
+        <input
+          v-model="newMember.joinDate"
+          type="date"
+          :max="clock.today"
+          required
+        />
+      </label>
+      <button class="primary" type="submit">팀원 등록</button>
+    </form>
+    <p class="muted">
+      입사일 기준으로 연차가 적립됩니다. 퇴사 처리해도 출퇴근·신청·이력은
+      남습니다.
+    </p>
+  </section>
 
   <section class="card">
     <h2>연구실 IP</h2>

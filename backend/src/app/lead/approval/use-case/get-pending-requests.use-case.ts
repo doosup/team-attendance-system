@@ -24,6 +24,10 @@ export class GetPendingRequestsUseCase implements UseCase<
       (await this.users.findAll()).map((u) => [u.id, u.name]),
     );
     const rows = await this.requests.findByStatus(status);
-    return rows.map((r) => withUserName(r, names.get(r.props.userId) ?? null));
+    // 퇴사자의 남은 신청은 리드가 처리할 대상이 아니다 (결정 A20)
+    return rows.flatMap((r) => {
+      const name = names.get(r.props.userId);
+      return name === undefined ? [] : [withUserName(r, name)];
+    });
   }
 }

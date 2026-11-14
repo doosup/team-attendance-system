@@ -11,6 +11,7 @@ export class GetMonthlySettlementQuery {
 export type SettlementRow = Omit<MonthlySettlement, 'asOf'> & {
   userId: number;
   name: string;
+  retiredDate: string | null; // 퇴사일 (KST), 재직 중이면 null
   remote: { used: number; exceptions: number };
 };
 

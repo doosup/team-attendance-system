@@ -29,22 +29,21 @@ export class GetRequestPdfUseCase implements UseCase<Input, Buffer> {
       throw new CustomException('REQUEST_NOT_FOUND');
     }
     const p = request.props;
-    // shortcut: findById는 퇴사자(소프트 삭제)를 못 찾아 '(퇴사자)'로 표시, 퇴사자 신청서를 보관용으로 뽑아야 하면 삭제 포함 조회 추가
-    const nameOf = async (id: number | null) =>
-      id === null
-        ? null
-        : ((await this.users.findById(id))?.name ?? '(퇴사자)');
-    const [applicantName, deciderName] = await Promise.all([
-      nameOf(p.userId),
-      nameOf(p.decidedById),
-    ]);
+    // 퇴사자의 신청서도 보관용으로 뽑을 수 있게 퇴사자 포함 조회 (결정 A20)
+    // shortcut: 이름 두 개를 위해 전체 사용자를 읽음(팀 4명), 인원이 늘면 id 목록 조회로
+    const names = new Map(
+      (await this.users.findAllIncludingRetired()).map((u) => [u.id, u.name]),
+    );
+    const applicantName = names.get(p.userId) ?? '-';
+    const deciderName =
+      p.decidedById === null ? null : (names.get(p.decidedById) ?? '-');
 
     return this.renderer.render({
       requestId: request.id,
       type: p.type,
       status: p.status,
       isOverLimit: p.isOverLimit,
-      applicantName: applicantName ?? '(퇴사자)',
+      applicantName,
       startDate: p.startDate,
       endDate: p.endDate,
       days: p.days.map(({ date, status, cancelType, cancelReason }) => ({

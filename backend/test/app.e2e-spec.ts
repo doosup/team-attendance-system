@@ -88,6 +88,8 @@ describe('핵심 흐름 (e2e)', () => {
         .post(path)
         .set('authorization', `Bearer ${tokens[who]}`)
         .send(body ?? {}),
+    delete: (path: string) =>
+      request(http).delete(path).set('authorization', `Bearer ${tokens[who]}`),
   });
   const setClock = (date: string, time: string) =>
     request(http)
@@ -186,6 +188,37 @@ describe('핵심 흐름 (e2e)', () => {
       .get(`/requests/${requestId}/pdf`)
       .expect(404);
     expect(denied.body.error.code).toBe('REQUEST_NOT_FOUND');
+  });
+
+  it('팀원 등록 → 새 계정 로그인 → 퇴사 처리 → 로그인 거부, 그 달 정산에는 남는다', async () => {
+    await setClock('2026-11-11', '10:00:00');
+    const created = await as('lead')
+      .post('/lead/users', {
+        loginId: 'newbie',
+        password: 'newbie-pass',
+        name: '신입',
+        joinDate: '2026-11-02',
+      })
+      .expect(201);
+    const id = created.body.data.id as number;
+    await request(http)
+      .post('/auth/login')
+      .send({ loginId: 'newbie', password: 'newbie-pass' })
+      .expect(200);
+
+    await as('lead').delete(`/lead/users/${id}`).expect(200);
+    const denied = await request(http)
+      .post('/auth/login')
+      .send({ loginId: 'newbie', password: 'newbie-pass' })
+      .expect(401);
+    expect(denied.body.error.code).toBe('INVALID_CREDENTIALS');
+
+    const nov = await as('lead').get('/lead/settlements?month=2026-11');
+    expect(
+      (
+        nov.body.data.rows as { name: string; retiredDate: string | null }[]
+      ).filter((r) => r.name === '신입'),
+    ).toEqual([expect.objectContaining({ retiredDate: '2026-11-11' })]);
   });
 
   it('등록되지 않은 IP는 403 IP_NOT_ALLOWED (같은 컴퓨터 프록시가 넘긴 X-Forwarded-For 기준)', async () => {

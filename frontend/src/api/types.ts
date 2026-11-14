@@ -91,6 +91,15 @@ export interface LeaveRequest {
   days: RequestDay[];
 }
 
+// 리드 팀원 관리 (GET·POST /lead/users)
+export interface Member {
+  id: number;
+  loginId: string;
+  name: string;
+  role: Role;
+  joinDate: string;
+}
+
 export interface AllowedIp {
   id: number;
   ip: string;
@@ -118,6 +127,7 @@ export interface ServerClock {
 export interface SettlementRow {
   userId: number;
   name: string;
+  retiredDate: string | null; // 퇴사일 (재직 중이면 null)
   workDays: number;
   workedMinutes: number;
   lateCount: number;

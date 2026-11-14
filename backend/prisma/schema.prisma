@@ -49,6 +49,7 @@ enum DayStatus {
 enum CancelType {
   SELF_BEFORE_DEADLINE
   LEAD_SAME_DAY
+  RETIREMENT
 }
 
 enum LeaveKind {
@@ -78,6 +79,8 @@ enum AuditAction {
   ALLOWED_IP_ADD
   ALLOWED_IP_DELETE
   CLOCK_CHANGE
+  USER_CREATE
+  USER_RETIRE
 }
 
 model User {

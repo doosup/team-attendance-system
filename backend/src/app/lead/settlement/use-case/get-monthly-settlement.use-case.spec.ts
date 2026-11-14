@@ -5,6 +5,7 @@ import { InMemoryRequestDayRepository } from '../../../../../test/fakes/in-memor
 import { InMemoryUserRepository } from '../../../../../test/fakes/in-memory-user.repository';
 import { KIM, LEAD } from '../../../../../test/fakes/users';
 import { Attendance } from '../../../../domain/entity/attendance.entity';
+import { User } from '../../../../domain/entity/user.entity';
 import { kstAt } from '../../../../domain/value/work-date';
 import { GetMonthlySettlementUseCase } from './get-monthly-settlement.use-case';
 
@@ -59,5 +60,65 @@ describe('GetMonthlySettlementUseCase', () => {
   it('month가 없으면 이번 달을 오늘 기준으로 정산한다', async () => {
     const r = await (await setup()).execute({});
     expect(r).toMatchObject({ month: '2026-11', asOf: '2026-11-13' });
+  });
+
+  it('그 달에 재직한 날이 있으면 퇴사자도 포함하고, 입사 전·퇴사 후 달에는 빠진다 (결정 A20)', async () => {
+    const retired = new User(
+      3,
+      'yeon',
+      'hash:x',
+      '연차원',
+      'MEMBER',
+      '2026-01-15',
+      kstAt('2026-10-20', '18:00:00'),
+    );
+    const joinedLater = new User(
+      4,
+      'im',
+      'hash:x',
+      '임자율',
+      'MEMBER',
+      '2026-11-02',
+    );
+    const useCase = new GetMonthlySettlementUseCase(
+      new FixedClock('2026-11-13', '09:00:00'),
+      new InMemoryUserRepository([LEAD, retired, joinedLater]),
+      new InMemoryAttendanceRepository(),
+      new InMemoryLedgerRepository(),
+      new InMemoryRequestDayRepository(),
+    );
+
+    const oct = await useCase.execute({ month: '2026-10' });
+    expect(oct.rows.map((x) => [x.name, x.retiredDate])).toEqual([
+      [LEAD.name, null],
+      ['연차원', '2026-10-20'],
+    ]);
+    const nov = await useCase.execute({ month: '2026-11' });
+    expect(nov.rows.map((x) => x.name)).toEqual([LEAD.name, '임자율']);
+  });
+
+  it('퇴사자의 원장은 퇴사일까지만 동기화한다 (퇴사 뒤 연차 적립이 생기지 않음)', async () => {
+    const retired = new User(
+      3,
+      'yeon',
+      'hash:x',
+      '연차원',
+      'MEMBER',
+      '2026-01-15',
+      kstAt('2026-10-20', '18:00:00'),
+    );
+    const ledger = new InMemoryLedgerRepository();
+    await new GetMonthlySettlementUseCase(
+      new FixedClock('2026-11-20', '09:00:00'),
+      new InMemoryUserRepository([LEAD, retired]),
+      new InMemoryAttendanceRepository(),
+      ledger,
+      new InMemoryRequestDayRepository(),
+    ).execute({ month: '2026-10' });
+
+    const dates = (await ledger.findByUser(3)).map(
+      (e) => e.props.effectiveDate,
+    );
+    expect(dates.at(-1)).toBe('2026-10-15'); // 11/15 적립 없음
   });
 });

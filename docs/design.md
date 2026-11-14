@@ -78,7 +78,7 @@ erDiagram
         int userId FK
         string date "YYYY-MM-DD"
         DayStatus status "ACTIVE | CANCELED"
-        CancelType cancelType "nullable, SELF_BEFORE_DEADLINE | LEAD_SAME_DAY"
+        CancelType cancelType "nullable, SELF_BEFORE_DEADLINE | LEAD_SAME_DAY | RETIREMENT"
         int canceledById FK "nullable"
         datetime canceledAt "nullable"
         string cancelReason "nullable"
@@ -206,10 +206,10 @@ erDiagram
 | RequestType | ANNUAL, REMOTE, HALF_OFF, WEEKEND_WORK |
 | RequestStatus | PENDING, APPROVED, REJECTED, CANCELED |
 | DayStatus | ACTIVE, CANCELED |
-| CancelType | SELF_BEFORE_DEADLINE, LEAD_SAME_DAY |
+| CancelType | SELF_BEFORE_DEADLINE, LEAD_SAME_DAY, RETIREMENT(퇴사 처리로 자동 취소, ATT-32) |
 | LeaveKind | ANNUAL, HALF_OFF |
 | LedgerEvent | ACCRUE, USE, EXPIRE, RESTORE |
-| AuditAction | CHECK_IN, CHECK_OUT, MANUAL_CHECK_OUT, REQUEST_CREATE, REQUEST_CANCEL, REQUEST_DAY_CANCEL, REQUEST_APPROVE, REQUEST_REJECT, LOGIN, LOGIN_FAIL, IP_BLOCKED, ALLOWED_IP_ADD, ALLOWED_IP_DELETE, CLOCK_CHANGE |
+| AuditAction | CHECK_IN, CHECK_OUT, MANUAL_CHECK_OUT, REQUEST_CREATE, REQUEST_CANCEL, REQUEST_DAY_CANCEL, REQUEST_APPROVE, REQUEST_REJECT, LOGIN, LOGIN_FAIL, IP_BLOCKED, ALLOWED_IP_ADD, ALLOWED_IP_DELETE, CLOCK_CHANGE, USER_CREATE, USER_RETIRE |
 
 SQLite는 enum 타입이 없어 문자열(TEXT)로 저장되고, 검증은 세 겹: TypeScript 타입 → API 입력(`@IsEnum`) → Prisma Client. DB 수준 강제가 필요하면 CHECK 제약조건 또는 PostgreSQL 전환.
 
@@ -246,7 +246,8 @@ backend/src/
 │       ├── attendance/   get-missing-checkouts (팀 전체)
 │       ├── balance/      get-user-ledger
 │       ├── audit-log/    get-audit-logs
-│       └── settlement/   get-monthly-settlement (선택)
+│       ├── settlement/   get-monthly-settlement (선택)
+│       └── member/       get-members, register-member, retire-member (선택, ATT-32)
 ├── domain/                              Domain 계층 (Nest·Prisma import 금지)
 │   ├── entity/           user, attendance, request, request-day, ledger-entry, allowed-ip, audit-log (.entity.ts)
 │   ├── repository/       *.repository.ts  ← abstract class (인터페이스)
@@ -339,6 +340,9 @@ backend/src/
 | 리드 | POST | /lead/requests/:id/days/:date/cancel | 당일 취소 `{ cancelReason }` → 그날 긴급 출근 | 리드 | FR-REQ-01 |
 | 리드 | GET | /lead/missing-checkouts | 팀 전체 퇴근 미기록·직접 입력 건 | 리드 | FR-DSH-01 |
 | 리드 | GET | /lead/users/:userId/ledger | 팀원 원장 내역 | 리드 | FR-BAL-01 |
+| 리드 | GET | /lead/users | 재직 중인 사용자 목록 `[{ id, loginId, name, role, joinDate }]` (선택, ATT-32) | 리드 | FR-SYS-02 |
+| 리드 | POST | /lead/users | 팀원 등록 `{ loginId, password, name, joinDate }`, 역할은 팀원 고정 (결정 A19) | 리드 | FR-SYS-02 |
+| 리드 | DELETE | /lead/users/:id | 퇴사 처리 = 소프트 삭제 + 내일 이후 신청 날짜 자동 취소·원장 복원. 리드는 불가 (결정 A20) | 리드 | FR-SYS-02 |
 | 리드 | GET | /lead/allowed-ips | 연구실 IP 목록 | 리드 | FR-SYS-01 |
 | 리드 | POST | /lead/allowed-ips | 추가 `{ ip, label }` (형식 검사·정규화) | 리드 | FR-SYS-01 |
 | 리드 | DELETE | /lead/allowed-ips/:id | 소프트 삭제 (현재 접속 IP·마지막 IP 불가) | 리드 | FR-SYS-01 |
@@ -378,10 +382,19 @@ backend/src/
 - 내려받기는 조회라 이력을 남기지 않는다 (결정 A14)
 
 **월별 정산 (`GET /lead/settlements?month=`)**
-- 응답: `{ month, asOf, rows: [{ userId, name, workDays, workedMinutes, lateCount, earlyLeaveCount, manualCount, missingCount, annualUsedDays, halfOffUsed, remote: { used, exceptions }, annualBalanceDays, halfOffBalance }] }`
+- 응답: `{ month, asOf, rows: [{ userId, name, retiredDate, workDays, workedMinutes, lateCount, earlyLeaveCount, manualCount, missingCount, annualUsedDays, halfOffUsed, remote: { used, exceptions }, annualBalanceDays, halfOffBalance }] }`
 - 판정은 `domain/policy/settlement.policy.ts` 순수 함수. 출퇴근에 저장해 둔 판정(isLate·isEarlyLeave·workedMinutes)을 모으기만 한다 (판정 결과 저장의 이유)
 - 처음 설계는 `infrastructure/query`에서 바로 집계였으나, app → infrastructure 의존이 생겨 팀 보드와 같은 "저장소 + 순수 정책"으로 바꿈
 - 잔여 기준일(`asOf`): 지난달은 말일, 이번 달·미래 달은 오늘. 기준일까지 효력이 생긴 원장만 합산 → 지난달 정산이 이후 신청으로 바뀌지 않는다 (결정 A18)
+- 대상: 그 달에 재직한 날이 있는 사람 (입사일 ≤ 말일, 퇴사일 ≥ 1일). 퇴사자도 포함하고 `retiredDate`(KST 날짜)로 표시, 입사 전 달에는 행이 없다 (결정 A20)
+
+**팀원 등록·퇴사 (`/lead/users`, ATT-32)**
+- 회원가입 대신 리드가 등록한다: 입사일이 연차 적립 기준이라 본인이 정하면 안 됨 (결정 A19)
+- 퇴사 = `deletedAt`(Clock 시각). 기존 `deletedAt: null` 조회 규칙 덕분에 로그인(401)·팀 보드에서는 따로 손대지 않아도 빠진다. 리드 신청 목록·팀 미기록은 신청·출퇴근 행 기준이라 재직자 이름이 있는 행만 남긴다
+- 원장은 추가 전용이라 정산에서 퇴사자를 동기화할 때 퇴사일까지만 채운다 (퇴사 뒤 연차 적립이 영구히 남지 않게)
+- 아이디 중복(퇴사자 포함)은 `loginId @unique`가 최종 차단하고 저장소가 P2002를 `DUPLICATE_LOGIN_ID`로 바꾼다 (동시 등록도 409)
+- 퇴사자를 남겨야 하는 조회만 `findAllIncludingRetired()`를 쓴다: 월별 정산, 신청서 PDF의 이름
+- 자동 취소는 `Request.cancelForRetirement()`(엔티티: 승인은 내일 이후만, 대기는 전부) → 원장 복원은 본인 취소와 같은 `restoreDrafts` → 이력 `USER_RETIRE`에 취소한 날짜 수·복원량
 
 **IP 검사 (IpGuard, 전역)**
 - 가드 순서: JwtAuthGuard → IpGuard → RolesGuard. 재택 IP는 신청한 본인에게만 열려야 해서 사용자를 먼저 안다
@@ -423,11 +436,14 @@ backend/src/
 | OVER_LIMIT_REASON_REQUIRED | 422 | 재택 한도를 넘는 예외 신청에 사유가 없음 |
 | CANNOT_DELETE_CURRENT_IP | 409 | 현재 접속 중인 IP 삭제 시도 |
 | CANNOT_DELETE_LAST_IP | 409 | 마지막 남은 연구실 IP 삭제 시도 |
+| DUPLICATE_LOGIN_ID | 409 | 팀원 등록 시 이미 있는 아이디 (퇴사자 포함) |
+| JOIN_DATE_IN_FUTURE | 422 | 팀원 등록 시 입사일이 오늘 이후 |
+| CANNOT_RETIRE_LEAD | 409 | 리드(본인 포함)를 퇴사 처리 |
 | DUPLICATE_ALLOWED_IP | 409 | 살아 있는 연구실 IP와 같은 IP 추가 (정규화 후 비교) |
 | ALLOWED_IP_NOT_FOUND | 404 | 없거나 이미 삭제된 연구실 IP 삭제 |
 | ON_ANNUAL_LEAVE | 409 | 승인된 연차일에 출근 시도 (출근이 필요하면 리드 당일 취소 → 긴급 출근) |
 | WEEKEND_WORK_NOT_APPROVED | 403 | 승인된 주말·공휴일 근무 신청 없이 주말·공휴일 출근 (FR-ATT-04) |
-| USER_NOT_FOUND | 404 | 리드가 없는(또는 퇴사한) 사용자의 원장 조회 |
+| USER_NOT_FOUND | 404 | 리드가 없는(또는 퇴사한) 사용자의 원장 조회·퇴사 처리 |
 | VALIDATION_FAILED | 400 | 입력 형식 오류 (DTO 검증) |
 
 재택 한도 초과는 에러가 아니라 예외 신청(`isOverLimit: true`)으로 접수된다.

@@ -1,3 +1,4 @@
+import { kstAt } from '../../domain/value/work-date';
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { User } from '../../domain/entity/user.entity';
@@ -59,7 +60,7 @@ describe('JwtAuthGuard', () => {
   });
 
   it('토큰이 유효해도 퇴사한 사용자면 UNAUTHORIZED', async () => {
-    users.softDelete(KIM.id);
+    await users.retire(KIM.id, kstAt('2026-11-12', '18:00:00'));
     const { ctx } = contextWith({ authorization: 'Bearer token:2' });
     expect(await codeOf(guard.canActivate(ctx))).toBe('UNAUTHORIZED');
   });

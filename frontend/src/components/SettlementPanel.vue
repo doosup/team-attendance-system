@@ -55,7 +55,12 @@ watch([month, () => clock.version], load);
           </thead>
           <tbody>
             <tr v-for="r in data.rows" :key="r.userId">
-              <td>{{ r.name }}</td>
+              <td>
+                {{ r.name }}
+                <span v-if="r.retiredDate" class="tag">
+                  퇴사 {{ r.retiredDate }}
+                </span>
+              </td>
               <td>{{ r.workDays }}일</td>
               <td>{{ minutesText(r.workedMinutes) }}</td>
               <td>{{ r.lateCount }}</td>
