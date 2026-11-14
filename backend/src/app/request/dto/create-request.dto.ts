@@ -88,6 +88,8 @@ export class RequestResult {
     readonly endTime: string | null,
     readonly decidedAt: string | null,
     readonly rejectReason: string | null,
+    readonly accessChangedAt: string | null,
+    readonly accessChangeReason: string | null,
     readonly days: RequestDayResult[],
   ) {}
 
@@ -109,6 +111,8 @@ export class RequestResult {
       p.endTime,
       p.decidedAt?.toISOString() ?? null,
       p.rejectReason,
+      p.accessChangedAt?.toISOString() ?? null,
+      p.accessChangeReason,
       p.days.map(
         (d) =>
           new RequestDayResult(

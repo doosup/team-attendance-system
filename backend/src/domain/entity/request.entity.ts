@@ -5,6 +5,7 @@ import {
   RequestType,
 } from '../repository/request-day.repository';
 import { CustomException } from '../exception/custom.exception';
+import { assertTimeWindow } from '../policy/request.policy';
 import { User } from './user.entity';
 
 export type HalfOffPart = 'AM' | 'PM';
@@ -36,7 +37,17 @@ export interface RequestProps {
   decidedById: number | null;
   decidedAt: Date | null;
   rejectReason: string | null;
+  // 리드가 접속 IP·시간대를 바꾼 기록 (A23). 바꾸기 전 값은 이력에
+  accessChangedAt: Date | null;
+  accessChangedById: number | null;
+  accessChangeReason: string | null;
   days: RequestDayProps[];
+}
+
+export interface Access {
+  ip: string;
+  startTime: string;
+  endTime: string;
 }
 
 // 신청서 한 장(기간) + 실제 적용 날짜(RequestDay). 정책은 기간, 저장은 날짜 (ADR-004)
@@ -71,6 +82,9 @@ export class Request {
       decidedById: auto ? applicant.id : null,
       decidedAt: auto ? now : null,
       rejectReason: null,
+      accessChangedAt: null,
+      accessChangedById: null,
+      accessChangeReason: null,
       days: dates.map((date) => ({
         id: null,
         date,
@@ -166,6 +180,52 @@ export class Request {
       this.props.status = 'CANCELED';
     }
     return canceled.flatMap((d) => (d.id === null ? [] : [d.id]));
+  }
+
+  /**
+   * 리드의 접속 IP·시간대 변경 (A23): 재택·주말 근무, 대기·승인, 오늘 이후 날짜가 남은 것만.
+   * IP 형식·사유 검사는 유스케이스. 바꾸기 전 값을 돌려준다 (이력용)
+   */
+  changeAccess(
+    leadId: number,
+    access: Access,
+    reason: string,
+    today: string,
+    now: Date,
+  ): Access {
+    const { type, status } = this.props;
+    if (type !== 'REMOTE' && type !== 'WEEKEND_WORK') {
+      throw new CustomException('ACCESS_CHANGE_NOT_ALLOWED');
+    }
+    if (status !== 'PENDING' && status !== 'APPROVED') {
+      throw new CustomException('INVALID_STATUS_TRANSITION');
+    }
+    if (
+      !this.props.days.some((d) => d.status === 'ACTIVE' && d.date >= today)
+    ) {
+      throw new CustomException('ACCESS_CHANGE_NOT_ALLOWED');
+    }
+    assertTimeWindow(access.startTime, access.endTime);
+    const before = {
+      ip: this.props.ip ?? '',
+      startTime: this.props.startTime ?? '',
+      endTime: this.props.endTime ?? '',
+    };
+    // 그대로 저장하면 바뀌지 않은 신청에 "리드 변경" 표시와 이력이 남는다
+    if (
+      before.ip === access.ip &&
+      before.startTime === access.startTime &&
+      before.endTime === access.endTime
+    ) {
+      throw new CustomException('VALIDATION_FAILED', '바뀐 내용이 없습니다');
+    }
+    Object.assign(this.props, {
+      ...access,
+      accessChangedAt: now,
+      accessChangedById: leadId,
+      accessChangeReason: reason,
+    });
+    return before;
   }
 
   get dayIds(): number[] {

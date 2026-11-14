@@ -44,6 +44,16 @@ export function datesForRequest(
   return dates;
 }
 
+/** 재택·주말 근무·반일 OFF 시간대: 시작이 종료보다 일러야 한다 (신청·리드 변경 공통) */
+export function assertTimeWindow(startTime: string, endTime: string): void {
+  if (startTime >= endTime) {
+    throw new CustomException(
+      'VALIDATION_FAILED',
+      'startTime은 endTime보다 일러야 합니다',
+    );
+  }
+}
+
 /** 시작일의 직전 영업일 17:00:00 */
 export const deadlineOf = (startDate: string): Date =>
   kstAt(previousBusinessDay(startDate), '17:00:00');

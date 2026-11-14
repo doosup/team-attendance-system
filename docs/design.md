@@ -63,6 +63,9 @@ erDiagram
         RequestStatus status "PENDING | APPROVED | REJECTED | CANCELED"
         boolean isOverLimit "재택 한도 초과 예외 신청"
         boolean isAfterDeadline "기한 후 예외 신청 (A22)"
+        datetime accessChangedAt "nullable, 리드가 IP·시간대를 바꾼 시각 (A23)"
+        int accessChangedById "nullable, 바꾼 리드"
+        string accessChangeReason "nullable"
         string reason
         string ip "nullable, REMOTE·WEEKEND_WORK"
         HalfOffPart halfOffPart "nullable, AM | PM (반일 OFF, 표시용)"
@@ -214,7 +217,7 @@ erDiagram
 | HalfOffPart | AM(오전 OFF), PM(오후 OFF) — 반일 OFF 신청의 선택 입력, 표시용 (ATT-34) |
 | LeaveKind | ANNUAL, HALF_OFF |
 | LedgerEvent | ACCRUE, USE, EXPIRE, RESTORE |
-| AuditAction | CHECK_IN, CHECK_OUT, MANUAL_CHECK_OUT, REQUEST_CREATE, REQUEST_CANCEL, REQUEST_DAY_CANCEL, REQUEST_APPROVE, REQUEST_REJECT, LOGIN, LOGIN_FAIL, IP_BLOCKED, ALLOWED_IP_ADD, ALLOWED_IP_DELETE, CLOCK_CHANGE, USER_CREATE, USER_RETIRE |
+| AuditAction | CHECK_IN, CHECK_OUT, MANUAL_CHECK_OUT, REQUEST_CREATE, REQUEST_CANCEL, REQUEST_DAY_CANCEL, REQUEST_APPROVE, REQUEST_REJECT, LOGIN, LOGIN_FAIL, IP_BLOCKED, ALLOWED_IP_ADD, ALLOWED_IP_DELETE, CLOCK_CHANGE, USER_CREATE, USER_RETIRE, REQUEST_ACCESS_CHANGE |
 
 SQLite는 enum 타입이 없어 문자열(TEXT)로 저장되고, 검증은 세 겹: TypeScript 타입 → API 입력(`@IsEnum`) → Prisma Client. DB 수준 강제가 필요하면 CHECK 제약조건 또는 PostgreSQL 전환.
 
@@ -343,6 +346,7 @@ backend/src/
 | 리드 | POST | /lead/requests/:id/approve | 승인 | 리드 | FR-REQ-02 |
 | 리드 | POST | /lead/requests/:id/reject | 반려 `{ rejectReason }` | 리드 | FR-REQ-02 |
 | 리드 | POST | /lead/requests/:id/days/:date/cancel | 당일 취소 `{ cancelReason }` → 그날 긴급 출근 | 리드 | FR-REQ-01 |
+| 리드 | POST | /lead/requests/:id/access | 재택·주말 근무의 접속 IP·시간대 변경 `{ ip, startTime, endTime, reason }`. 대기·승인 상태이고 오늘 이후 날짜가 남은 것만, 사유 필수, 이력 `REQUEST_ACCESS_CHANGE`(전·후 값) (A23, ATT-42) | 리드 | FR-SYS-01, FR-ATT-04 |
 | 리드 | GET | /lead/missing-checkouts | 팀 전체 퇴근 미기록·직접 입력 건 | 리드 | FR-DSH-01 |
 | 리드 | GET | /lead/users/:userId/ledger | 팀원 원장 내역 | 리드 | FR-BAL-01 |
 | 리드 | GET | /lead/users?includeRetired= | 재직 중인 사용자 목록 `[{ id, loginId, name, role, joinDate, retiredDate }]` (선택, ATT-32). `includeRetired=true`면 퇴사자도(이력 필터·이름 표시용, ATT-38) | 리드 | FR-SYS-02 |
@@ -437,7 +441,8 @@ backend/src/
 | OVERLAPPING_REQUEST | 409 | 이미 신청이 있는 날짜와 겹침 |
 | SAME_DAY_CANCEL_LEAD_ONLY | 403 | 팀원이 기한 지난 뒤 진행 중인(오늘이 기간 안) 신청을 취소하려 함 → 리드 당일 취소 안내 |
 | NOT_SAME_DAY | 422 | 리드 당일 취소에 오늘이 아닌 날짜 |
-| INVALID_STATUS_TRANSITION | 409 | 이미 처리된 신청 승인·반려·취소 |
+| INVALID_STATUS_TRANSITION | 409 | 이미 처리된 신청 승인·반려·취소·IP 변경 |
+| ACCESS_CHANGE_NOT_ALLOWED | 422 | 재택·주말 근무가 아니거나, 오늘 이후 날짜가 남지 않은 신청의 IP·시간대 변경 (A23) |
 | REQUEST_NOT_FOUND | 404 | 없는 신청을 승인·반려·취소 |
 | INVALID_IP_FORMAT | 422 | IP 형식 오류 (연구실 IP, 재택·주말 근무 신청) |
 | OVER_LIMIT_REASON_REQUIRED | 422 | 재택 한도를 넘는 예외 신청에 사유가 없음 |

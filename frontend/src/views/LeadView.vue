@@ -179,6 +179,56 @@ const nameOf = (id: unknown) =>
 
 const period = (r: LeaveRequest) =>
   r.endDate === r.startDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`;
+
+// 재택·주말 근무 IP (A23): 대기·승인 중 오늘 이후 날짜가 남은 것.
+// 승인된 것은 그날 그 시간대에 신청자 본인만 자동 허용되고, 끝나면 지울 것이 없다
+const accessRows = computed(() =>
+  [...pending.value, ...approved.value]
+    .filter(
+      (r) =>
+        (r.type === 'REMOTE' || r.type === 'WEEKEND_WORK') &&
+        r.days.some((d) => d.status === 'ACTIVE' && d.date >= clock.today),
+    )
+    .sort((a, b) => a.startDate.localeCompare(b.startDate)),
+);
+const nowHm = computed(() =>
+  kstTime(clock.serverNow.toISOString()).slice(0, 5),
+);
+function accessState(r: LeaveRequest) {
+  if (r.status === 'PENDING') return { label: '승인 대기', cls: 'warn' };
+  const isToday = r.days.some(
+    (d) => d.date === clock.today && d.status === 'ACTIVE',
+  );
+  if (!isToday) return { label: '예정', cls: '' };
+  const open =
+    (r.startTime ?? '') <= nowHm.value && nowHm.value <= (r.endTime ?? '');
+  return open
+    ? { label: '지금 허용 중', cls: 'ok' }
+    : { label: '오늘 · 시간대 밖', cls: '' };
+}
+
+const editing = reactive({
+  id: 0,
+  ip: '',
+  startTime: '',
+  endTime: '',
+  reason: '',
+});
+const startEdit = (r: LeaveRequest) =>
+  Object.assign(editing, {
+    id: r.id,
+    ip: r.ip ?? '',
+    startTime: r.startTime ?? '',
+    endTime: r.endTime ?? '',
+    reason: '',
+  });
+const saveAccess = () =>
+  guard(async () => {
+    const { id, ...body } = editing;
+    await api('POST', `/lead/requests/${id}/access`, body);
+    editing.id = 0;
+    await load();
+  });
 </script>
 
 <template>
@@ -341,7 +391,91 @@ const period = (r: LeaveRequest) =>
   </section>
 
   <section class="card">
+    <h2>재택·주말 근무 IP ({{ accessRows.length }})</h2>
+    <p class="muted">
+      승인된 신청의 IP는 그날 신청한 시간대에 신청자 본인만 자동으로 허용됩니다.
+      끝나면 따로 지울 필요가 없습니다. IP를 잘못 적었으면 사유를 남기고 고칠 수
+      있습니다.
+    </p>
+    <p v-if="accessRows.length === 0" class="muted">
+      오늘 이후 재택·주말 근무 신청이 없습니다
+    </p>
+    <table v-else>
+      <thead>
+        <tr>
+          <th>이름</th>
+          <th>종류</th>
+          <th>날짜</th>
+          <th>IP · 시간대</th>
+          <th>상태</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template v-for="r in accessRows" :key="r.id">
+          <tr>
+            <td>{{ r.userName }}</td>
+            <td>{{ REQUEST_TYPE[r.type] }}</td>
+            <td>{{ period(r) }}</td>
+            <td>
+              {{ r.ip }} · {{ r.startTime }}~{{ r.endTime }}
+              <div v-if="r.accessChangedAt" class="muted">
+                <span class="tag">리드 변경</span>
+                {{ kstDateTime(r.accessChangedAt) }} ·
+                {{ r.accessChangeReason }}
+              </div>
+            </td>
+            <td>
+              <span :class="['tag', accessState(r).cls]">{{
+                accessState(r).label
+              }}</span>
+            </td>
+            <td>
+              <button @click="startEdit(r)">IP·시간대 변경</button>
+            </td>
+          </tr>
+          <tr v-if="editing.id === r.id">
+            <td colspan="6">
+              <form class="row" @submit.prevent="saveAccess">
+                <input
+                  v-model="editing.ip"
+                  aria-label="새 접속 IP"
+                  placeholder="IP"
+                  required
+                />
+                <input
+                  v-model="editing.startTime"
+                  type="time"
+                  aria-label="시작 시각"
+                  required
+                />
+                ~
+                <input
+                  v-model="editing.endTime"
+                  type="time"
+                  aria-label="종료 시각"
+                  required
+                />
+                <input
+                  v-model="editing.reason"
+                  size="24"
+                  placeholder="변경 사유 (필수)"
+                  aria-label="변경 사유"
+                  required
+                />
+                <button class="primary" type="submit">저장</button>
+                <button type="button" @click="editing.id = 0">취소</button>
+              </form>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
     <h2>연구실 IP</h2>
+    <p class="muted">모든 사람에게 항상 허용됩니다. 지울 때까지 유지됩니다.</p>
     <table>
       <tbody>
         <tr v-for="ip in ips" :key="ip.id">

@@ -76,6 +76,21 @@ export class PrismaRequestRepository extends RequestRepository {
     }
   }
 
+  async saveAccess(request: Request): Promise<void> {
+    const p = request.props;
+    await this.tx.request.update({
+      where: { id: request.id },
+      data: {
+        ip: p.ip,
+        startTime: p.startTime,
+        endTime: p.endTime,
+        accessChangedAt: p.accessChangedAt,
+        accessChangedById: p.accessChangedById,
+        accessChangeReason: p.accessChangeReason,
+      },
+    });
+  }
+
   async findByUser(
     userId: number,
     includeCanceled: boolean,

@@ -10,10 +10,12 @@ import { ApproveRequestController } from './approval/controller/approve-request.
 import { CancelRequestDayController } from './approval/controller/cancel-request-day.controller';
 import { GetPendingRequestsController } from './approval/controller/get-pending-requests.controller';
 import { RejectRequestController } from './approval/controller/reject-request.controller';
+import { ChangeRequestAccessController } from './approval/controller/change-request-access.controller';
 import { ApproveRequestUseCase } from './approval/use-case/approve-request.use-case';
 import { CancelRequestDayUseCase } from './approval/use-case/cancel-request-day.use-case';
 import { GetPendingRequestsUseCase } from './approval/use-case/get-pending-requests.use-case';
 import { RejectRequestUseCase } from './approval/use-case/reject-request.use-case';
+import { ChangeRequestAccessUseCase } from './approval/use-case/change-request-access.use-case';
 import { GetTeamMissingController } from './attendance/controller/get-team-missing.controller';
 import { GetTeamMissingUseCase } from './attendance/use-case/get-team-missing.use-case';
 import { GetAuditLogsController } from './audit-log/controller/get-audit-logs.controller';
@@ -38,6 +40,7 @@ import { GetMonthlySettlementUseCase } from './settlement/use-case/get-monthly-s
     GetPendingRequestsController,
     ApproveRequestController,
     RejectRequestController,
+    ChangeRequestAccessController,
     CancelRequestDayController,
     GetAllowedIpsController,
     AddAllowedIpController,
@@ -54,6 +57,7 @@ import { GetMonthlySettlementUseCase } from './settlement/use-case/get-monthly-s
     GetPendingRequestsUseCase,
     ApproveRequestUseCase,
     RejectRequestUseCase,
+    ChangeRequestAccessUseCase,
     CancelRequestDayUseCase,
     GetAllowedIpsUseCase,
     AddAllowedIpUseCase,
