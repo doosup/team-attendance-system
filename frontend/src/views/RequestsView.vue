@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { VueDatePicker } from '@vuepic/vue-datepicker';
+import '@vuepic/vue-datepicker/dist/main.css';
+import { ko } from 'date-fns/locale';
 import { api, ApiError, download } from '@/api/client';
 import type { Balance, Holiday, LeaveRequest, RequestType } from '@/api/types';
 import { REQUEST_STATUS, REQUEST_TYPE } from '@/format';
@@ -80,10 +83,14 @@ watch([includeCanceled, () => clock.version], load);
 
 // 공휴일 표시 (ATT-37): 서버가 영업일 판정에 쓰는 목록을 그대로 받아 날짜 옆에 보여 준다
 const holidays = ref<Holiday[]>([]);
+const holidaysLoaded = ref(false);
 onMounted(() =>
   api<Holiday[]>('GET', '/holidays').then(
-    (h) => (holidays.value = h),
-    () => {}, // 표시용이라 실패해도 신청은 된다
+    (h) => {
+      holidays.value = h;
+      holidaysLoaded.value = h.length > 0; // 빈 목록이면 연도·종류 판단을 하지 않음
+    },
+    () => {}, // 표시용이라 실패해도 신청은 된다 (달력도 종류별로 막지 않음)
   ),
 );
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
@@ -100,6 +107,48 @@ function dayNote(date: string) {
 const upcoming = computed(() =>
   holidays.value.filter((h) => h.date >= clock.today).slice(0, 4),
 );
+
+// 달력 (ATT-39): 서버가 거부할 날만 막는다. 판단은 같은 공휴일 데이터로, 서버 검증은 그대로
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const holidaySet = computed(() => new Set(holidays.value.map((h) => h.date)));
+const lastYear = computed(() =>
+  Number(holidays.value.at(-1)?.date.slice(0, 4) ?? 0),
+);
+const isOffDay = (date: string) => {
+  const w = weekday(date);
+  return w === '토' || w === '일' || holidaySet.value.has(date);
+};
+/** 오늘·지난 날짜(PAST_DATE_REQUEST)와, 공휴일 데이터가 있을 때만 종류별 불가 날짜 */
+function blocked(d: Date, from = '') {
+  const date = ymd(d);
+  if (date <= clock.today || (from && date < from)) return true;
+  if (!holidaysLoaded.value) return false;
+  if (Number(date.slice(0, 4)) > lastYear.value) return true; // INVALID_DATE_RANGE
+  if (form.type === 'HALF_OFF') return isOffDay(date); // 영업일만
+  if (form.type === 'WEEKEND_WORK') return !isOffDay(date); // 주말·공휴일만
+  return false; // 연차·재택 기간은 주말을 끼어도 됨 (영업일만 차감)
+}
+const markers = computed(() =>
+  holidays.value.map((h) => ({
+    date: new Date(`${h.date}T00:00:00`),
+    type: 'dot' as const,
+    color: '#cf222e',
+    tooltip: [{ text: h.name }],
+  })),
+);
+const dayClass = (d: Date) => (isOffDay(ymd(d)) ? 'dp-off' : '');
+// 두 칸이 같은 설정을 쓴다
+const picker = {
+  locale: ko,
+  modelType: 'yyyy-MM-dd',
+  formats: { input: 'yyyy-MM-dd (EEE)' },
+  timeConfig: { enableTimePicker: false },
+  autoApply: true,
+  weekStart: 0,
+  dayClass,
+  inputAttrs: { required: true, clearable: false },
+};
 
 async function submit() {
   error.value = notice.value = '';
@@ -214,19 +263,37 @@ async function pdf(r: LeaveRequest) {
       </label>
       <label>
         <span>{{ single ? '날짜' : '시작일' }}</span>
-        <input v-model="form.startDate" type="date" required />
+        <VueDatePicker
+          v-model="form.startDate"
+          v-bind="picker"
+          class="date"
+          :disabled-dates="(d: Date) => blocked(d)"
+          :markers="markers"
+          :aria-labels="{ input: single ? '날짜' : '시작일' }"
+        />
         <span v-if="dayNote(form.startDate)" class="tag">{{
           dayNote(form.startDate)
         }}</span>
       </label>
       <label v-if="!single">
         <span>종료일</span>
-        <input v-model="form.endDate" type="date" required />
+        <VueDatePicker
+          v-model="form.endDate"
+          v-bind="picker"
+          class="date"
+          :disabled-dates="(d: Date) => blocked(d, form.startDate)"
+          :markers="markers"
+          :aria-labels="{ input: '종료일' }"
+        />
         <span v-if="dayNote(form.endDate)" class="tag">{{
           dayNote(form.endDate)
         }}</span>
         <span class="muted"> 영업일만 차감·적용됩니다</span>
       </label>
+      <p class="muted">
+        달력의 빨간 날은 주말·공휴일(점에 마우스를 올리면 이름)이고, 회색은 이
+        종류로 신청할 수 없는 날입니다
+      </p>
       <label v-if="needsIp">
         <span>접속 IP</span>
         <input v-model="form.ip" placeholder="예: 203.0.113.10" required />
@@ -386,5 +453,14 @@ async function pdf(r: LeaveRequest) {
 }
 .part label {
   margin: 0;
+}
+.date {
+  display: inline-block;
+  width: 190px;
+  vertical-align: middle;
+}
+/* 주말·공휴일은 빨간 글자 (달력 날짜 칸, scoped 밖이라 :deep) */
+:deep(.dp-off) {
+  color: #cf222e;
 }
 </style>
