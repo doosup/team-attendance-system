@@ -240,7 +240,7 @@ backend/src/
 │   │   ├── dto/          check-in.dto.ts, manual-check-out.dto.ts, get-today.dto.ts …
 │   │   ├── use-case/     check-in.use-case.ts …
 │   │   └── attendance.module.ts
-│   ├── request/          create-request, get-my-requests, cancel-request, get-request-pdf (선택)
+│   ├── request/          create-request, get-my-requests, cancel-request, get-request-pdf (선택), get-holidays
 │   ├── balance/          get-my-balance, get-my-ledger
 │   ├── dashboard/        get-team-board, get-my-missing-checkouts
 │   ├── dev/              get-clock, set-clock, reset-clock (개발 모드에서만 모듈 등록)
@@ -334,6 +334,7 @@ backend/src/
 | 신청 | GET | /requests/me | 내 신청 목록 (날짜별 상태 포함) | 로그인 | FR-REQ-01 |
 | 신청 | POST | /requests/:id/cancel | 본인 전체 취소 (시작일의 직전 영업일 17:00:00까지) | 본인 | FR-REQ-01 |
 | 신청 | GET | /requests/:id/pdf | 신청서 PDF 내려받기 (선택). `application/pdf` 파일 자체로 응답 (`{ data }` 감싸지 않음) | 본인·리드 | FR-REQ-03 |
+| 신청 | GET | /holidays | 공휴일 목록 `[{ date, name }]` (날짜순). 서버 영업일 판정과 같은 데이터라 신청 화면이 날짜 옆에 공휴일·주말을 표시 (ATT-37) | 로그인 | FR-REQ-01 |
 | 잔여 | GET | /balances/me | 연차·OFF(만료일 포함) 잔여, 이번 달 재택 `used/2 + 예외 n회` | 로그인 | FR-BAL-01 |
 | 잔여 | GET | /balances/me/ledger | 내 원장 내역 | 로그인 | FR-BAL-01 |
 | 대시보드 | GET | /dashboard/team?date= | 팀원별 그날 상태. 팀원은 상태만, 리드는 시각·지각·조퇴·10시 경과 미출근 포함 | 로그인 | FR-DSH-01 |

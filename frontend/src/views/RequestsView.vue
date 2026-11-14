@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { api, ApiError, download } from '@/api/client';
-import type { Balance, LeaveRequest, RequestType } from '@/api/types';
+import type { Balance, Holiday, LeaveRequest, RequestType } from '@/api/types';
 import { REQUEST_STATUS, REQUEST_TYPE } from '@/format';
 import { useClockStore } from '@/stores/clock';
 
@@ -77,6 +77,29 @@ async function load() {
 }
 onMounted(load);
 watch([includeCanceled, () => clock.version], load);
+
+// 공휴일 표시 (ATT-37): 서버가 영업일 판정에 쓰는 목록을 그대로 받아 날짜 옆에 보여 준다
+const holidays = ref<Holiday[]>([]);
+onMounted(() =>
+  api<Holiday[]>('GET', '/holidays').then(
+    (h) => (holidays.value = h),
+    () => {}, // 표시용이라 실패해도 신청은 된다
+  ),
+);
+const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
+const weekday = (date: string) =>
+  WEEKDAY[new Date(`${date}T00:00:00Z`).getUTCDay()];
+/** 고른 날짜가 공휴일·주말이면 알려 준다 (영업일이면 빈 문자열) */
+function dayNote(date: string) {
+  if (!date) return '';
+  const h = holidays.value.find((x) => x.date === date);
+  if (h) return `${h.name} (공휴일)`;
+  const w = weekday(date);
+  return w === '토' || w === '일' ? `${w}요일 (주말)` : '';
+}
+const upcoming = computed(() =>
+  holidays.value.filter((h) => h.date >= clock.today).slice(0, 4),
+);
 
 async function submit() {
   error.value = notice.value = '';
@@ -167,6 +190,14 @@ async function pdf(r: LeaveRequest) {
         · 재택·주말 근무는 신청한 IP와 시간대에서만 출퇴근할 수 있습니다
       </template>
     </p>
+    <p v-if="upcoming.length" class="muted summary">
+      다가오는 공휴일:
+      <template v-for="(h, i) in upcoming" :key="h.date"
+        >{{ i ? ' · ' : '' }}{{ h.date.slice(5).replace('-', '/') }}({{
+          weekday(h.date)
+        }}) {{ h.name }}</template
+      >
+    </p>
     <form
       id="request-form"
       role="tabpanel"
@@ -184,10 +215,16 @@ async function pdf(r: LeaveRequest) {
       <label>
         <span>{{ single ? '날짜' : '시작일' }}</span>
         <input v-model="form.startDate" type="date" required />
+        <span v-if="dayNote(form.startDate)" class="tag">{{
+          dayNote(form.startDate)
+        }}</span>
       </label>
       <label v-if="!single">
         <span>종료일</span>
         <input v-model="form.endDate" type="date" required />
+        <span v-if="dayNote(form.endDate)" class="tag">{{
+          dayNote(form.endDate)
+        }}</span>
         <span class="muted"> 영업일만 차감·적용됩니다</span>
       </label>
       <label v-if="needsIp">
