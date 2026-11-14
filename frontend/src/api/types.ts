@@ -49,6 +49,12 @@ export interface HalfOff {
   endTime: string | null;
 }
 
+// GET /holidays — 서버 영업일 판정과 같은 공휴일 목록
+export interface Holiday {
+  date: string;
+  name: string;
+}
+
 export interface BoardRow {
   userId: number;
   name: string;
