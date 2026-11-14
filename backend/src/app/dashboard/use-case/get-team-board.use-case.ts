@@ -36,15 +36,19 @@ export class GetTeamBoardUseCase implements UseCase<Input, TeamBoardRow[]> {
       const mine = days.filter((d) => d.userId === u.id);
       const { status, pastTen } = boardStatus(target, a, mine, now);
       const row: TeamBoardRow = { userId: u.id, name: u.name, status };
-      // 반일 OFF 근무 예정 시간대는 일정 정보라 팀원에게도 보인다 (ATT-34)
+      // 반일 OFF 오전/오후·반차 시간은 일정 정보라 팀원에게도 보인다 (ATT-34)
       const halfOff = mine.find(
         (d) =>
           d.type === 'HALF_OFF' &&
           d.requestStatus === 'APPROVED' &&
           d.dayStatus === 'ACTIVE',
       );
-      if (halfOff?.startTime && halfOff.endTime) {
-        row.halfOffTime = `${halfOff.startTime}~${halfOff.endTime}`;
+      if (halfOff && (halfOff.halfOffPart || halfOff.startTime)) {
+        row.halfOff = {
+          part: halfOff.halfOffPart,
+          startTime: halfOff.startTime,
+          endTime: halfOff.endTime,
+        };
       }
       if (!isLead) return row;
       const p = a?.props;

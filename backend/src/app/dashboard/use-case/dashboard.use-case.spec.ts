@@ -46,7 +46,7 @@ describe('대시보드', () => {
       });
     });
 
-    it('반일 OFF인 사람은 팀원에게도 근무 예정 시간대가 보인다 (ATT-34)', async () => {
+    it('반일 OFF인 사람은 팀원에게도 오전/오후와 반차 시간이 보인다 (ATT-34)', async () => {
       requestDays.rows.push({
         requestDayId: 1,
         userId: LEAD.id,
@@ -55,15 +55,16 @@ describe('대시보드', () => {
         requestStatus: 'APPROVED',
         dayStatus: 'ACTIVE',
         cancelType: null,
-        startTime: '13:00',
-        endTime: '17:00',
+        halfOffPart: 'AM',
+        startTime: '09:00',
+        endTime: '13:00',
       });
       const rows = await board(KIM);
       expect(rows.find((r) => r.userId === LEAD.id)).toEqual({
         userId: LEAD.id,
         name: '이리드',
         status: 'HALF_OFF',
-        halfOffTime: '13:00~17:00',
+        halfOff: { part: 'AM', startTime: '09:00', endTime: '13:00' },
       });
     });
 

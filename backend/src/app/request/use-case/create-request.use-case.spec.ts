@@ -254,6 +254,38 @@ describe('CreateRequestUseCase', () => {
       ).toBe('VALIDATION_FAILED');
     });
 
+    it('반일 OFF는 오전/오후와 반차 시간 없이도 신청된다 (과제 FN-REQ-01은 종류·날짜·사유만)', async () => {
+      await ledger.append([
+        {
+          userId: KIM.id,
+          kind: 'HALF_OFF',
+          event: 'ACCRUE',
+          halfDays: 1,
+          effectiveDate: '2026-11-07',
+          expiresOn: '2026-12-07',
+          grantId: null,
+          requestDayId: null,
+          dedupKey: 'ACCRUE:HALF_OFF:attendance:1',
+        },
+      ]);
+      const r = await useCase.execute({
+        ip: '127.0.0.1',
+        user: KIM,
+        input: {
+          type: 'HALF_OFF',
+          startDate: '2026-11-16',
+          endDate: '2026-11-16',
+          reason: '',
+        },
+      });
+      expect(r).toMatchObject({
+        status: 'PENDING',
+        halfOffPart: null,
+        startTime: null,
+        endTime: null,
+      });
+    });
+
     it('OFF가 없으면 INSUFFICIENT_BALANCE', async () => {
       expect(
         await codeOf(
@@ -295,14 +327,16 @@ describe('CreateRequestUseCase', () => {
           startDate: '2026-11-16',
           endDate: '2026-11-16',
           reason: '',
-          startTime: '13:00',
-          endTime: '17:00',
+          halfOffPart: 'AM',
+          startTime: '09:00',
+          endTime: '13:00',
         },
       });
       expect(r).toMatchObject({
         ip: null,
-        startTime: '13:00',
-        endTime: '17:00',
+        halfOffPart: 'AM',
+        startTime: '09:00',
+        endTime: '13:00',
       });
       const use = ledger.rows.find((e) => e.props.event === 'USE');
       expect(use?.props).toMatchObject({

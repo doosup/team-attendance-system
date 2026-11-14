@@ -16,6 +16,7 @@ export const RequestMapper = {
       isOverLimit: m.isOverLimit,
       reason: m.reason,
       ip: m.ip,
+      halfOffPart: m.halfOffPart,
       startTime: m.startTime,
       endTime: m.endTime,
       decidedById: m.decidedById,

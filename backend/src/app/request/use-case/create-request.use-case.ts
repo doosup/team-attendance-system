@@ -116,10 +116,18 @@ export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
     return RequestResult.from(saved);
   }
 
-  // 재택·주말 근무: IP + 시간대(접속 허용), 반일 OFF: 근무 예정 시간대만(표시용, ATT-34)
+  // 재택·주말 근무: IP + 시간대(접속 허용), 반일 OFF: 오전/오후·반차 예정 시간(선택, 표시용, ATT-34)
   private ipAndTime(input: CreateRequestRequest) {
-    if (input.type === 'ANNUAL') {
-      return { ip: null, startTime: null, endTime: null };
+    const none = {
+      ip: null,
+      halfOffPart: null,
+      startTime: null,
+      endTime: null,
+    };
+    if (input.type === 'ANNUAL') return none;
+    const halfOffPart = input.halfOffPart ?? null;
+    if (input.type === 'HALF_OFF' && input.startTime === undefined) {
+      return { ...none, halfOffPart };
     }
     const { startTime = '', endTime = '' } = input;
     if (startTime >= endTime) {
@@ -128,10 +136,12 @@ export class CreateRequestUseCase implements UseCase<Input, RequestResult> {
         'startTime은 endTime보다 일러야 합니다',
       );
     }
-    if (input.type === 'HALF_OFF') return { ip: null, startTime, endTime };
+    if (input.type === 'HALF_OFF') {
+      return { ip: null, halfOffPart, startTime, endTime };
+    }
     const ip = normalizeIp(input.ip ?? '');
     if (!isValidIp(ip)) throw new CustomException('INVALID_IP_FORMAT');
-    return { ip, startTime, endTime };
+    return { ip, halfOffPart: null, startTime, endTime };
   }
 
   private async remoteDaysByMonth(userId: number, dates: string[]) {

@@ -64,7 +64,8 @@ erDiagram
         boolean isOverLimit "재택 한도 초과 예외 신청"
         string reason
         string ip "nullable, REMOTE·WEEKEND_WORK"
-        string startTime "nullable, HH:mm"
+        HalfOffPart halfOffPart "nullable, AM | PM (반일 OFF, 표시용)"
+        string startTime "nullable, HH:mm (반일 OFF는 반차 예정 시간)"
         string endTime "nullable, HH:mm"
         int decidedById FK "nullable"
         datetime decidedAt "nullable"
@@ -207,6 +208,7 @@ erDiagram
 | RequestStatus | PENDING, APPROVED, REJECTED, CANCELED |
 | DayStatus | ACTIVE, CANCELED |
 | CancelType | SELF_BEFORE_DEADLINE, LEAD_SAME_DAY, RETIREMENT(퇴사 처리로 자동 취소, ATT-32) |
+| HalfOffPart | AM(오전 OFF), PM(오후 OFF) — 반일 OFF 신청의 선택 입력, 표시용 (ATT-34) |
 | LeaveKind | ANNUAL, HALF_OFF |
 | LedgerEvent | ACCRUE, USE, EXPIRE, RESTORE |
 | AuditAction | CHECK_IN, CHECK_OUT, MANUAL_CHECK_OUT, REQUEST_CREATE, REQUEST_CANCEL, REQUEST_DAY_CANCEL, REQUEST_APPROVE, REQUEST_REJECT, LOGIN, LOGIN_FAIL, IP_BLOCKED, ALLOWED_IP_ADD, ALLOWED_IP_DELETE, CLOCK_CHANGE, USER_CREATE, USER_RETIRE |
@@ -326,7 +328,7 @@ backend/src/
 | 출퇴근 | POST | /attendance/:id/manual-check-out | 미기록 퇴근 직접 입력 `{ checkOutAt }` | 본인 | FR-ATT-03 |
 | 출퇴근 | POST | /attendance/check-out | 퇴근. 미기록 퇴근이 남아 있으면 `PENDING_MANUAL_CHECKOUT`로 거부 | 로그인 | FR-ATT-02, 04 |
 | 출퇴근 | GET | /attendance/me?month= | 내 월별 기록 | 로그인 | FR-DSH-01 |
-| 신청 | POST | /requests | 신청 `{ type, startDate, endDate, reason, ip?, startTime?, endTime? }`. 재택·주말 근무는 IP·시간대 필수, 반일 OFF는 근무 예정 시간대 필수(표시용, 결정 A21). 반일 OFF·주말 근무는 startDate = endDate. 재택 한도 초과면 `isOverLimit: true`로 접수 | 로그인 | FR-REQ-01 |
+| 신청 | POST | /requests | 신청 `{ type, startDate, endDate, reason, ip?, halfOffPart?, startTime?, endTime? }`. 재택·주말 근무는 IP·시간대 필수. 반일 OFF는 오전/오후(`AM`·`PM`)와 반차 예정 시간(쉬는 시간대)을 **선택**으로 받음(표시용, 시간을 적으면 둘 다, 결정 A21). 반일 OFF·주말 근무는 startDate = endDate. 재택 한도 초과면 `isOverLimit: true`로 접수 | 로그인 | FR-REQ-01 |
 | 신청 | GET | /requests/me | 내 신청 목록 (날짜별 상태 포함) | 로그인 | FR-REQ-01 |
 | 신청 | POST | /requests/:id/cancel | 본인 전체 취소 (시작일의 직전 영업일 17:00:00까지) | 본인 | FR-REQ-01 |
 | 신청 | GET | /requests/:id/pdf | 신청서 PDF 내려받기 (선택). `application/pdf` 파일 자체로 응답 (`{ data }` 감싸지 않음) | 본인·리드 | FR-REQ-03 |
@@ -371,7 +373,7 @@ backend/src/
 **팀 보드 (`GET /dashboard/team?date=`)**
 - 상태: WORKING(출근) / LEFT(퇴근) / REMOTE(재택 근무 중) / ANNUAL(연차) / HALF_OFF(반일 OFF, 출근 전) / PENDING_APPROVAL(승인 대기) / NOT_CHECKED_IN(미출근) / DAY_OFF(주말·공휴일)
 - 판정은 `domain/policy/board.policy.ts` 순수 함수. 저장소의 날짜별 조회(출퇴근·신청 날짜)를 모아 넘긴다 → query 계층 없이도 테스트 가능해 팀 보드는 저장소를 쓴다
-- 팀원 응답은 `{ userId, name, status, halfOffTime? }`만(반일 OFF 근무 예정 'HH:mm~HH:mm'은 일정 정보라 모두에게, 결정 A21), 리드는 근무 유형·출퇴근 시각·지각·조퇴·근무시간·직접 입력 여부·`pastTen`(10:00 지나도 미출근)까지
+- 팀원 응답은 `{ userId, name, status, halfOff? }`만(승인된 반일 OFF의 `{ part, startTime, endTime }` — 오전/오후·반차 예정 시간은 일정 정보라 모두에게, 결정 A21), 리드는 근무 유형·출퇴근 시각·지각·조퇴·근무시간·직접 입력 여부·`pastTen`(10:00 지나도 미출근)까지
 
 **신청서 PDF (`GET /requests/:id/pdf`)**
 - 권한: 본인 신청은 본인, 모든 신청은 리드. 팀원이 남의 신청을 요청하면 **없는 신청과 같은 404 `REQUEST_NOT_FOUND`** (본인 취소와 같은 규칙, 존재 여부를 드러내지 않음). 화면도 내 신청 목록·리드 신청 목록에만 버튼을 둔다

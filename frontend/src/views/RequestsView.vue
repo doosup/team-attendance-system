@@ -8,7 +8,11 @@ import { useClockStore } from '@/stores/clock';
 // 신청서 (FN-REQ-01). 쉬는 신청(휴가)과 일하는 방식 신청(근무)을 탭으로 나눈다 (ATT-33)
 // API는 하나(POST /requests)라 정산·원장·PDF는 그대로
 type Tab = 'LEAVE' | 'WORK';
-const TABS: { key: Tab; label: string; types: RequestType[] }[] = [
+const TABS: {
+  key: Tab;
+  label: string;
+  types: [RequestType, ...RequestType[]];
+}[] = [
   { key: 'LEAVE', label: '휴가 신청', types: ['ANNUAL', 'HALF_OFF'] },
   { key: 'WORK', label: '근무 신청', types: ['REMOTE', 'WEEKEND_WORK'] },
 ];
@@ -38,10 +42,11 @@ const single = computed(
 const needsIp = computed(
   () => form.type === 'REMOTE' || form.type === 'WEEKEND_WORK',
 );
-// 반일 OFF: 오전/오후를 고르면 근무 예정 시간대를 채운다. 둘 다 점심 차감 후 4시간 (ATT-34)
+// 반일 OFF: 오전/오후를 고르면 반차(쉬는) 예정 시간을 채운다 (ATT-34)
+// 그대로 쓰면 13:00→17:00, 09:00→14:00(점심 차감) 모두 4시간 근무로 정상
 const HALF_OFF_PRESET = {
-  AM: { startTime: '08:00', endTime: '13:00' },
-  PM: { startTime: '13:00', endTime: '17:00' },
+  AM: { startTime: '09:00', endTime: '13:00' },
+  PM: { startTime: '14:00', endTime: '18:00' },
 } as const;
 const halfPart = ref<keyof typeof HALF_OFF_PRESET>('AM');
 const needsTime = computed(() => needsIp.value || form.type === 'HALF_OFF');
@@ -82,6 +87,7 @@ async function submit() {
       endDate: single.value ? form.startDate : form.endDate,
       reason: form.reason,
       ...(needsIp.value ? { ip: form.ip } : {}),
+      ...(form.type === 'HALF_OFF' ? { halfOffPart: halfPart.value } : {}),
       ...(needsTime.value
         ? { startTime: form.startTime, endTime: form.endTime }
         : {}),
@@ -185,21 +191,25 @@ async function pdf(r: LeaveRequest) {
         <input v-model="form.ip" placeholder="예: 203.0.113.10" required />
       </label>
       <fieldset v-if="form.type === 'HALF_OFF'" class="part">
-        <legend>근무</legend>
+        <legend>구분</legend>
         <label>
-          <input v-model="halfPart" type="radio" value="AM" /> 오전 근무
+          <input v-model="halfPart" type="radio" value="AM" /> 오전 OFF (오전
+          반차)
         </label>
         <label>
-          <input v-model="halfPart" type="radio" value="PM" /> 오후 근무
+          <input v-model="halfPart" type="radio" value="PM" /> 오후 OFF (오후
+          반차)
         </label>
       </fieldset>
       <label v-if="needsTime">
-        <span>{{ form.type === 'HALF_OFF' ? '근무 예정' : '시간대' }}</span>
+        <span>{{
+          form.type === 'HALF_OFF' ? '반차 예정 시간' : '시간대'
+        }}</span>
         <input v-model="form.startTime" type="time" required /> ~
         <input v-model="form.endTime" type="time" required />
         <span v-if="form.type === 'HALF_OFF'" class="muted">
-          팀 보드에 표시됩니다. 판정은 실제 근무 4시간 기준이며,
-          점심(11:30~12:30)을 끼면 1시간 더 있어야 합니다
+          쉬는 시간대로, 팀 보드·리드 목록·PDF에 표시됩니다. 출퇴근 판정은 실제
+          근무 4시간 기준이며 점심(11:30~12:30)을 끼면 1시간 더 있어야 합니다
         </span>
       </label>
       <label>

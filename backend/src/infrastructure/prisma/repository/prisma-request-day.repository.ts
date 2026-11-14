@@ -92,7 +92,13 @@ export class PrismaRequestDayRepository extends RequestDayRepository {
       where: { date },
       include: {
         request: {
-          select: { type: true, status: true, startTime: true, endTime: true },
+          select: {
+            type: true,
+            status: true,
+            halfOffPart: true,
+            startTime: true,
+            endTime: true,
+          },
         },
       },
     });
@@ -103,6 +109,7 @@ export class PrismaRequestDayRepository extends RequestDayRepository {
       requestStatus: r.request.status,
       dayStatus: r.status,
       cancelType: r.cancelType,
+      halfOffPart: r.request.halfOffPart,
       startTime: r.request.startTime,
       endTime: r.request.endTime,
     }));

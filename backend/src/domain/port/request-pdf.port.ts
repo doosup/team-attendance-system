@@ -22,6 +22,7 @@ export interface RequestDocument {
   }[];
   reason: string;
   ip: string | null;
+  halfOffPart: 'AM' | 'PM' | null;
   startTime: string | null;
   endTime: string | null;
   deciderName: string | null;

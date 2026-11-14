@@ -8,7 +8,7 @@ import type {
   Member,
   MissingCheckout,
 } from '@/api/types';
-import { kstDateTime, kstTime, REQUEST_TYPE } from '@/format';
+import { halfOffText, kstDateTime, kstTime, REQUEST_TYPE } from '@/format';
 import SettlementPanel from '@/components/SettlementPanel.vue';
 import { useClockStore } from '@/stores/clock';
 
@@ -176,9 +176,17 @@ const period = (r: LeaveRequest) =>
           </td>
           <td>
             {{ r.reason || '-' }}
-            <div v-if="r.startTime" class="muted">
-              {{ r.ip ? `${r.ip} ·` : '근무 예정' }}
-              {{ r.startTime }}~{{ r.endTime }}
+            <div v-if="r.type === 'HALF_OFF'" class="muted">
+              {{
+                halfOffText({
+                  part: r.halfOffPart,
+                  startTime: r.startTime,
+                  endTime: r.endTime,
+                })
+              }}
+            </div>
+            <div v-else-if="r.startTime" class="muted">
+              {{ r.ip }} · {{ r.startTime }}~{{ r.endTime }}
             </div>
           </td>
           <td class="row">

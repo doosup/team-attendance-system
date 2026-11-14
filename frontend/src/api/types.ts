@@ -42,11 +42,18 @@ export interface Balance {
   remote: { month: string; used: number; limit: number; exceptions: number };
 }
 
+export type HalfOffPart = 'AM' | 'PM';
+export interface HalfOff {
+  part: HalfOffPart | null;
+  startTime: string | null;
+  endTime: string | null;
+}
+
 export interface BoardRow {
   userId: number;
   name: string;
   status: string;
-  halfOffTime?: string; // 반일 OFF 근무 예정 'HH:mm~HH:mm'
+  halfOff?: HalfOff; // 승인된 반일 OFF의 오전/오후·반차 예정 시간
   dayType?: string | null;
   checkInAt?: string | null;
   checkOutAt?: string | null;
@@ -86,6 +93,7 @@ export interface LeaveRequest {
   isOverLimit: boolean;
   reason: string;
   ip: string | null;
+  halfOffPart: HalfOffPart | null;
   startTime: string | null;
   endTime: string | null;
   rejectReason: string | null;

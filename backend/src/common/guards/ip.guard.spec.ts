@@ -42,6 +42,7 @@ describe('IpGuard', () => {
         isOverLimit: false,
         reason: '',
         ip: '10.0.0.7',
+        halfOffPart: null,
         startTime: '09:00',
         endTime: '18:00',
       },

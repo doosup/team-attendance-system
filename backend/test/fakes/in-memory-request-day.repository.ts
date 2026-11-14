@@ -8,6 +8,7 @@ type Row = DayRequest & {
   userId: number;
   date: string;
   isOverLimit?: boolean;
+  halfOffPart?: 'AM' | 'PM' | null;
   startTime?: string | null;
   endTime?: string | null;
 };
@@ -31,6 +32,7 @@ export class InMemoryRequestDayRepository extends RequestDayRepository {
         dayStatus: d.status,
         cancelType: d.cancelType,
         isOverLimit: r.props.isOverLimit,
+        halfOffPart: r.props.halfOffPart,
         startTime: r.props.startTime,
         endTime: r.props.endTime,
       })),
@@ -104,6 +106,7 @@ export class InMemoryRequestDayRepository extends RequestDayRepository {
         .filter((r) => r.date === date)
         .map(({ date: _date, isOverLimit: _over, ...day }) => ({
           ...day,
+          halfOffPart: day.halfOffPart ?? null,
           startTime: day.startTime ?? null,
           endTime: day.endTime ?? null,
         })),
