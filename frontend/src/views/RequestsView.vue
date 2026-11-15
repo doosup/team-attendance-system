@@ -5,7 +5,12 @@ import '@vuepic/vue-datepicker/dist/main.css';
 import { ko } from 'date-fns/locale';
 import { api, ApiError, download } from '@/api/client';
 import type { Balance, Holiday, LeaveRequest, RequestType } from '@/api/types';
-import { kstDateTime, REQUEST_STATUS, REQUEST_TYPE } from '@/format';
+import {
+  kstDateTime,
+  remoteText,
+  REQUEST_STATUS,
+  REQUEST_TYPE,
+} from '@/format';
 import { useClockStore } from '@/stores/clock';
 
 // 신청서 (FN-REQ-01). 쉬는 신청(휴가)과 일하는 방식 신청(근무)을 탭으로 나눈다 (ATT-33)
@@ -65,6 +70,11 @@ watch(
 );
 const list = ref<LeaveRequest[]>([]);
 const balance = ref<Balance | null>(null);
+const remote = computed(
+  () =>
+    balance.value &&
+    remoteText(balance.value.remote, balance.value.remote.limit),
+);
 const includeCanceled = ref(false);
 const error = ref('');
 const notice = ref('');
@@ -232,10 +242,9 @@ async function pdf(r: LeaveRequest) {
         </template>
       </template>
       <template v-else>
-        이번 달 재택 {{ balance.remote.used }}/{{ balance.remote.limit }}회
-        <template v-if="balance.remote.exceptions">
-          + 예외 {{ balance.remote.exceptions }}회
-        </template>
+        이번 달 재택
+        {{ remote?.inLimit }}
+        <template v-if="remote?.over"> ({{ remote?.over }}) </template>
         · 재택·주말 근무는 신청한 IP와 시간대에서만 출퇴근할 수 있습니다
       </template>
     </p>
