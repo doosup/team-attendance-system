@@ -547,13 +547,15 @@ const saveAccess = () =>
       <tbody>
         <tr v-for="l in logs" :key="l.id">
           <td>
-            {{ kstDateTime(l.occurredAt) }}
+            <span class="nowrap">{{ kstDateTime(l.occurredAt) }}</span>
             <div class="muted" title="실제 기록 시각">
               {{ kstDateTime(l.createdAt) }}
             </div>
           </td>
-          <td>{{ l.actor?.name ?? '-' }}</td>
-          <td>{{ ACTION_LABEL[l.action as AuditAction] ?? l.action }}</td>
+          <td class="nowrap">{{ l.actor?.name ?? '-' }}</td>
+          <td class="nowrap">
+            {{ ACTION_LABEL[l.action as AuditAction] ?? l.action }}
+          </td>
           <td>
             {{ describeLog(l, nameOf) }}
             <details class="muted payload">
@@ -569,6 +571,9 @@ const saveAccess = () =>
 </template>
 
 <style scoped>
+.nowrap {
+  white-space: nowrap;
+}
 .payload {
   max-width: 420px;
   word-break: break-all;

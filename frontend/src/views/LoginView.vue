@@ -85,7 +85,7 @@ async function submit() {
 }
 hr {
   border: none;
-  border-top: 1px solid #eef0f2;
+  border-top: 1px solid var(--line-soft);
   margin: 16px 0;
 }
 </style>
