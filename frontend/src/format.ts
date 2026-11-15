@@ -72,3 +72,18 @@ export const REQUEST_STATUS: Record<string, string> = {
   REJECTED: '반려',
   CANCELED: '취소',
 };
+
+/**
+ * 재택 표시 (ATT-43): 한도 검사처럼 이번 달 재택일 합계로 센다.
+ * 서버는 신청서 단위로 정상/예외를 나눠 주지만(3일 예외 신청 → 예외 3), 화면은 "한도 안 n일 + 넘은 m일".
+ */
+export const remoteText = (
+  r: { used: number; exceptions: number },
+  limit = 2,
+) => {
+  const total = r.used + r.exceptions;
+  return {
+    inLimit: `${Math.min(total, limit)}/${limit}일`,
+    over: total > limit ? `${total - limit}일 초과` : '',
+  };
+};

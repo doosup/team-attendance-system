@@ -38,13 +38,16 @@ const logFilter = reactive({
   includeLogin: false,
 });
 const error = ref('');
+// 버튼 오류는 누른 카드 안에 보인다 (ATT-43). 목록 불러오기 오류만 맨 위
+type Card = 'pending' | 'today' | 'members' | 'access' | 'ip' | 'logs';
+const cardError = reactive<Partial<Record<Card, string>>>({});
 
-async function guard(action: () => Promise<unknown>) {
-  error.value = '';
+async function guard(card: Card, action: () => Promise<unknown>) {
+  cardError[card] = '';
   try {
     await action();
   } catch (e) {
-    error.value = e instanceof ApiError ? e.message : '요청에 실패했습니다';
+    cardError[card] = e instanceof ApiError ? e.message : '요청에 실패했습니다';
   }
 }
 
@@ -94,7 +97,7 @@ watch(() => clock.version, load);
 // 사람·로그인 포함을 바꾸면 바로 다시 조회 (기간은 두 칸을 고른 뒤 조회 버튼으로)
 watch(
   () => [logFilter.userId, logFilter.includeLogin],
-  () => guard(loadLogs),
+  () => guard('logs', loadLogs),
 );
 
 // 당일 취소 대상: 승인된 신청 중 오늘 날짜가 살아 있는 것 (결정 12)
@@ -105,13 +108,13 @@ const todays = computed(() =>
 );
 
 const approve = (r: LeaveRequest) =>
-  guard(async () => {
+  guard('pending', async () => {
     await api('POST', `/lead/requests/${r.id}/approve`);
     await load();
   });
 
 const reject = (r: LeaveRequest) =>
-  guard(async () => {
+  guard('pending', async () => {
     const rejectReason = prompt('반려 사유 (필수)');
     if (!rejectReason) return;
     await api('POST', `/lead/requests/${r.id}/reject`, { rejectReason });
@@ -119,7 +122,7 @@ const reject = (r: LeaveRequest) =>
   });
 
 const cancelToday = (r: LeaveRequest) =>
-  guard(async () => {
+  guard('today', async () => {
     const cancelReason = prompt(
       `${r.userName} ${clock.today} 당일 취소 사유 (필수, 그날은 긴급 출근)`,
     );
@@ -131,14 +134,14 @@ const cancelToday = (r: LeaveRequest) =>
   });
 
 const addIp = () =>
-  guard(async () => {
+  guard('ip', async () => {
     await api('POST', '/lead/allowed-ips', newIp);
     newIp.ip = newIp.label = '';
     await load();
   });
 
 const deleteIp = (ip: AllowedIp) =>
-  guard(async () => {
+  guard('ip', async () => {
     if (!confirm(`${ip.ip} (${ip.label})를 삭제할까요?`)) return;
     await api('DELETE', `/lead/allowed-ips/${ip.id}`);
     await load();
@@ -146,7 +149,7 @@ const deleteIp = (ip: AllowedIp) =>
 
 // 회원가입 대신 리드가 팀원을 등록한다 (결정 A19)
 const registerMember = () =>
-  guard(async () => {
+  guard('members', async () => {
     await api('POST', '/lead/users', newMember);
     Object.assign(newMember, {
       loginId: '',
@@ -159,7 +162,7 @@ const registerMember = () =>
 
 // 퇴사 처리 = 소프트 삭제. 기록은 남고 내일 이후 신청은 자동 취소 (결정 A20)
 const retireMember = (m: Member) =>
-  guard(async () => {
+  guard('members', async () => {
     if (
       !confirm(
         `${m.name}(${m.loginId})님을 퇴사 처리할까요?\n기록은 남고, 로그인과 팀 목록에서 빠지며 내일 이후 신청은 자동 취소됩니다.`,
@@ -170,8 +173,8 @@ const retireMember = (m: Member) =>
     await load();
   });
 
-const pdf = (r: LeaveRequest) =>
-  guard(() => download(`/requests/${r.id}/pdf`, `신청서-${r.id}.pdf`));
+const pdf = (r: LeaveRequest, card: Card) =>
+  guard(card, () => download(`/requests/${r.id}/pdf`, `신청서-${r.id}.pdf`));
 
 // 이력의 신청자 id → 이름. 퇴사자는 목록에 없어 #id로
 const nameOf = (id: unknown) =>
@@ -223,7 +226,7 @@ const startEdit = (r: LeaveRequest) =>
     reason: '',
   });
 const saveAccess = () =>
-  guard(async () => {
+  guard('access', async () => {
     const { id, ...body } = editing;
     await api('POST', `/lead/requests/${id}/access`, body);
     editing.id = 0;
@@ -236,6 +239,9 @@ const saveAccess = () =>
 
   <section class="card">
     <h2>승인 대기 ({{ pending.length }})</h2>
+    <p v-if="cardError.pending" class="error" role="alert">
+      {{ cardError.pending }}
+    </p>
     <p v-if="pending.length === 0" class="muted">대기 중인 신청이 없습니다</p>
     <table v-else>
       <tbody>
@@ -267,7 +273,7 @@ const saveAccess = () =>
           <td class="row">
             <button class="primary" @click="approve(r)">승인</button>
             <button class="danger" @click="reject(r)">반려</button>
-            <button @click="pdf(r)">PDF</button>
+            <button @click="pdf(r, 'pending')">PDF</button>
           </td>
         </tr>
       </tbody>
@@ -276,6 +282,9 @@ const saveAccess = () =>
 
   <section class="card">
     <h2>오늘({{ clock.today }}) 승인된 신청 · 당일 취소</h2>
+    <p v-if="cardError.today" class="error" role="alert">
+      {{ cardError.today }}
+    </p>
     <p v-if="todays.length === 0" class="muted">
       오늘 적용되는 승인 신청이 없습니다
     </p>
@@ -289,7 +298,7 @@ const saveAccess = () =>
             <button class="danger" @click="cancelToday(r)">
               오늘만 취소 (긴급 출근)
             </button>
-            <button @click="pdf(r)">PDF</button>
+            <button @click="pdf(r, 'today')">PDF</button>
           </td>
         </tr>
       </tbody>
@@ -321,6 +330,9 @@ const saveAccess = () =>
 
   <section class="card">
     <h2>팀원</h2>
+    <p v-if="cardError.members" class="error" role="alert">
+      {{ cardError.members }}
+    </p>
     <table>
       <thead>
         <tr>
@@ -392,6 +404,9 @@ const saveAccess = () =>
 
   <section class="card">
     <h2>재택·주말 근무 IP ({{ accessRows.length }})</h2>
+    <p v-if="cardError.access" class="error" role="alert">
+      {{ cardError.access }}
+    </p>
     <p class="muted">
       승인된 신청의 IP는 그날 신청한 시간대에 신청자 본인만 자동으로 허용됩니다.
       끝나면 따로 지울 필요가 없습니다. IP를 잘못 적었으면 사유를 남기고 고칠 수
@@ -485,6 +500,7 @@ const saveAccess = () =>
         </tr>
       </tbody>
     </table>
+    <p v-if="cardError.ip" class="error" role="alert">{{ cardError.ip }}</p>
     <form class="row" style="margin-top: 12px" @submit.prevent="addIp">
       <input v-model="newIp.ip" placeholder="IP (CIDR 미지원)" required />
       <input
@@ -498,7 +514,8 @@ const saveAccess = () =>
 
   <section class="card">
     <h2>인터랙션 이력</h2>
-    <form class="row" @submit.prevent="guard(loadLogs)">
+    <p v-if="cardError.logs" class="error" role="alert">{{ cardError.logs }}</p>
+    <form class="row" @submit.prevent="guard('logs', loadLogs)">
       <select v-model="logFilter.userId" aria-label="누가">
         <option value="">전체</option>
         <option v-for="m in everyone" :key="m.id" :value="String(m.id)">

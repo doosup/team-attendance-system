@@ -9,6 +9,7 @@ import {
   halfOffText,
   kstTime,
   minutesText,
+  remoteText,
 } from '@/format';
 import { useAuthStore } from '@/stores/auth';
 import { useClockStore } from '@/stores/clock';
@@ -18,6 +19,11 @@ const auth = useAuthStore();
 const clock = useClockStore();
 const today = ref<Today | null>(null);
 const balance = ref<Balance | null>(null);
+const remote = computed(
+  () =>
+    balance.value &&
+    remoteText(balance.value.remote, balance.value.remote.limit),
+);
 const board = ref<BoardRow[]>([]);
 const missing = ref<MissingCheckout[]>([]);
 const error = ref('');
@@ -145,9 +151,9 @@ async function press(path: '/attendance/check-in' | '/attendance/check-out') {
           <tr>
             <th>재택 ({{ balance.remote.month }})</th>
             <td>
-              {{ balance.remote.used }}/{{ balance.remote.limit }}
-              <span v-if="balance.remote.exceptions" class="tag warn">
-                + 예외 {{ balance.remote.exceptions }}회
+              {{ remote?.inLimit }}
+              <span v-if="remote?.over" class="tag warn">
+                {{ remote?.over }}
               </span>
             </td>
           </tr>

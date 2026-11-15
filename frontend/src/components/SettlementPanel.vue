@@ -2,7 +2,7 @@
 import { onMounted, ref, watch } from 'vue';
 import { api, ApiError } from '@/api/client';
 import type { MonthlySettlement } from '@/api/types';
-import { minutesText } from '@/format';
+import { minutesText, remoteText } from '@/format';
 import { useClockStore } from '@/stores/clock';
 
 // 리드: 월별 정산 (FR-STL-01)
@@ -70,9 +70,10 @@ watch([month, () => clock.version], load);
               <td>{{ r.annualUsedDays }}일</td>
               <td>{{ r.halfOffUsed }}개</td>
               <td>
-                {{ r.remote.used }}/2<template v-if="r.remote.exceptions">
-                  + 예외 {{ r.remote.exceptions }}</template
-                >
+                {{ remoteText(r.remote).inLimit }}
+                <span v-if="remoteText(r.remote).over" class="tag warn">
+                  {{ remoteText(r.remote).over }}
+                </span>
               </td>
               <td>{{ r.annualBalanceDays }}일</td>
               <td>{{ r.halfOffBalance }}개</td>
