@@ -65,6 +65,6 @@ async function run(action: () => Promise<void>) {
   left: 0;
   z-index: 10;
   width: 420px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
 }
 </style>

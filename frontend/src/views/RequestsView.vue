@@ -430,7 +430,7 @@ async function pdf(r: LeaveRequest) {
 .tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid #e3e6ea;
+  border-bottom: 1px solid var(--line);
   margin-bottom: 12px;
 }
 .tabs button {
@@ -440,16 +440,16 @@ async function pdf(r: LeaveRequest) {
   background: none;
   padding: 8px 14px;
   font-size: 15px;
-  color: #57606a;
+  color: var(--muted);
 }
 .tabs button.active {
-  border-bottom-color: #0b57d0;
-  color: #0b57d0;
+  border-bottom-color: var(--accent);
+  color: var(--accent);
   font-weight: 600;
 }
-.tabs button:focus-visible {
-  outline: 2px solid #0b57d0;
-  outline-offset: -2px;
+.tabs button:hover {
+  background: none;
+  color: var(--ink);
 }
 .summary {
   margin: 0 0 12px;
@@ -465,7 +465,7 @@ async function pdf(r: LeaveRequest) {
 .part legend {
   float: left;
   min-width: 90px;
-  color: #57606a;
+  color: var(--muted);
 }
 .part label {
   margin: 0;
