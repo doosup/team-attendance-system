@@ -30,6 +30,15 @@ export abstract class RequestDayRepository {
     date: string,
     ip: string,
   ): Promise<{ userId: number; startTime: string; endTime: string }[]>;
+  // 그 달(YYYY-MM) 확정된 날짜: 승인된 신청의 ACTIVE 날짜만, 날짜순 (팀 일정 달력, ATT-47)
+  abstract findApprovedInMonth(month: string): Promise<
+    {
+      date: string;
+      userId: number;
+      type: RequestType;
+      halfOffPart: 'AM' | 'PM' | null;
+    }[]
+  >;
   // 그날 모든 사람의 신청 (팀 보드). 오전/오후·시간대는 반일 OFF 표시용
   abstract findByDate(date: string): Promise<
     (DayRequest & {

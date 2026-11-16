@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { setApiHandlers } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import BlockedView from '@/views/BlockedView.vue';
+import CalendarView from '@/views/CalendarView.vue';
 import DashboardView from '@/views/DashboardView.vue';
 import LeadView from '@/views/LeadView.vue';
 import LoginView from '@/views/LoginView.vue';
@@ -24,6 +25,7 @@ const router = createRouter({
     },
     { path: '/', name: 'dashboard', component: DashboardView },
     { path: '/requests', name: 'requests', component: RequestsView },
+    { path: '/calendar', name: 'calendar', component: CalendarView },
     { path: '/lead', name: 'lead', component: LeadView, meta: { lead: true } },
   ],
 });

@@ -342,6 +342,7 @@ backend/src/
 | 잔여 | GET | /balances/me/ledger | 내 원장 내역 | 로그인 | FR-BAL-01 |
 | 대시보드 | GET | /dashboard/team?date= | 팀원별 그날 상태. 팀원은 상태만, 리드는 시각·지각·조퇴·10시 경과 미출근 포함 | 로그인 | FR-DSH-01 |
 | 대시보드 | GET | /dashboard/me/missing | 내 퇴근 미기록·직접 입력 건 | 로그인 | FR-DSH-01 |
+| 대시보드 | GET | /dashboard/calendar?month=YYYY-MM | 팀 일정 달력: 그 달 **확정된** 일정(승인된 신청의 취소 안 된 날짜)만 `{ date, userId, name, type, halfOffPart }`. 대기·반려·취소·퇴사자 제외, 모두에게 같은 필드 (ATT-47) | 로그인 | FR-DSH-01 |
 | 리드 | GET | /lead/requests?status=PENDING | 상태별 목록, 기본 대기 (시작일 가까운 순, 신청자 이름·예외 신청 표시) | 리드 | FR-REQ-02 |
 | 리드 | POST | /lead/requests/:id/approve | 승인 | 리드 | FR-REQ-02 |
 | 리드 | POST | /lead/requests/:id/reject | 반려 `{ rejectReason }` | 리드 | FR-REQ-02 |
@@ -381,6 +382,11 @@ backend/src/
 - 상태: WORKING(출근) / LEFT(퇴근) / REMOTE(재택 근무 중) / ANNUAL(연차) / HALF_OFF(반일 OFF, 출근 전) / PENDING_APPROVAL(승인 대기) / NOT_CHECKED_IN(미출근) / DAY_OFF(주말·공휴일)
 - 판정은 `domain/policy/board.policy.ts` 순수 함수. 저장소의 날짜별 조회(출퇴근·신청 날짜)를 모아 넘긴다 → query 계층 없이도 테스트 가능해 팀 보드는 저장소를 쓴다
 - 팀원 응답은 `{ userId, name, status, halfOff? }`만(승인된 반일 OFF의 `{ part, startTime, endTime }` — 오전/오후·반차 예정 시간은 일정 정보라 모두에게, 결정 A21), 리드는 근무 유형·출퇴근 시각·지각·조퇴·근무시간·직접 입력 여부·`pastTen`(10:00 지나도 미출근)까지
+
+**팀 일정 달력 (`GET /dashboard/calendar?month=`)**
+- "누가 언제 없는지/어디서 일하는지"를 미리 보는 화면용. 확정된 것만: `Request.status = APPROVED` 이고 `RequestDay.status = ACTIVE`. 리드 당일 취소한 날은 빠진다
+- 이름·종류·반일 OFF 오전/오후만. IP·사유·출퇴근 시각은 넣지 않는다(일정 정보만, 결정 16·A21과 같은 기준). 리드도 같은 필드
+- 재직자만(`deletedAt: null`, 팀 보드와 같은 기준). `month` 형식이 틀리면 400 `VALIDATION_FAILED`, 없으면 이번 달(Clock)
 
 **신청서 PDF (`GET /requests/:id/pdf`)**
 - 권한: 본인 신청은 본인, 모든 신청은 리드. 팀원이 남의 신청을 요청하면 **없는 신청과 같은 404 `REQUEST_NOT_FOUND`** (본인 취소와 같은 규칙, 존재 여부를 드러내지 않음). 화면도 내 신청 목록·리드 신청 목록에만 버튼을 둔다
