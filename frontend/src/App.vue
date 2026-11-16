@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
 import { RouterLink, RouterView, useRouter } from 'vue-router';
+import ChangePasswordModal from '@/components/ChangePasswordModal.vue';
 import ClockPanel from '@/components/ClockPanel.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useClockStore } from '@/stores/clock';
@@ -8,6 +9,7 @@ import { useClockStore } from '@/stores/clock';
 const auth = useAuthStore();
 const clock = useClockStore();
 const router = useRouter();
+const changingPassword = ref(false);
 
 watch(
   () => auth.me,
@@ -37,9 +39,16 @@ function logout() {
       <span class="who"
         >{{ auth.me.name }} ({{ auth.isLead ? '리드' : '팀원' }})</span
       >
+      <button class="link" @click="changingPassword = true">
+        비밀번호 변경
+      </button>
       <button class="link" @click="logout">로그아웃</button>
     </div>
   </header>
+  <ChangePasswordModal
+    v-if="auth.me && changingPassword"
+    @close="changingPassword = false"
+  />
   <main class="page">
     <RouterView />
   </main>

@@ -59,6 +59,10 @@ export class PrismaUserRepository extends UserRepository {
     await this.tx.user.update({ where: { id }, data: { deletedAt: at } });
   }
 
+  async changePassword(id: number, passwordHash: string): Promise<void> {
+    await this.tx.user.update({ where: { id }, data: { passwordHash } });
+  }
+
   async findByLoginId(loginId: string): Promise<User | null> {
     const m = await this.tx.user.findFirst({
       where: { loginId, deletedAt: null },

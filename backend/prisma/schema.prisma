@@ -82,6 +82,7 @@ enum AuditAction {
   USER_CREATE
   USER_RETIRE
   REQUEST_ACCESS_CHANGE
+  PASSWORD_CHANGE
 }
 
 model User {
@@ -95,14 +96,15 @@ model User {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  attendances       Attendance[]
-  requests          Request[]     @relation("RequestOwner")
-  decidedRequests   Request[]     @relation("RequestDecider")
-  requestDays       RequestDay[]  @relation("RequestDayOwner")
-  canceledDays      RequestDay[]  @relation("RequestDayCanceler")
-  ledgerEntries     LeaveLedger[]
-  auditLogs         AuditLog[]
-  createdAllowedIps AllowedIp[]
+  attendances           Attendance[]
+  requests              Request[]     @relation("RequestOwner")
+  decidedRequests       Request[]     @relation("RequestDecider")
+  accessChangedRequests Request[]     @relation("RequestAccessChanger")
+  requestDays           RequestDay[]  @relation("RequestDayOwner")
+  canceledDays          RequestDay[]  @relation("RequestDayCanceler")
+  ledgerEntries         LeaveLedger[]
+  auditLogs             AuditLog[]
+  createdAllowedIps     AllowedIp[]
 }
 
 model Attendance {
@@ -152,9 +154,10 @@ model Request {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  user      User         @relation("RequestOwner", fields: [userId], references: [id])
-  decidedBy User?        @relation("RequestDecider", fields: [decidedById], references: [id])
-  days      RequestDay[]
+  user            User         @relation("RequestOwner", fields: [userId], references: [id])
+  decidedBy       User?        @relation("RequestDecider", fields: [decidedById], references: [id])
+  accessChangedBy User?        @relation("RequestAccessChanger", fields: [accessChangedById], references: [id])
+  days            RequestDay[]
 
   @@index([userId, status])
   @@index([status, startDate])

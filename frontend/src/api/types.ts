@@ -153,7 +153,8 @@ export type AuditAction =
   | 'CLOCK_CHANGE'
   | 'USER_CREATE'
   | 'USER_RETIRE'
-  | 'REQUEST_ACCESS_CHANGE';
+  | 'REQUEST_ACCESS_CHANGE'
+  | 'PASSWORD_CHANGE';
 
 export interface AuditLog {
   id: number;

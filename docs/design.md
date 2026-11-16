@@ -217,7 +217,7 @@ erDiagram
 | HalfOffPart | AM(오전 OFF), PM(오후 OFF) — 반일 OFF 신청의 선택 입력, 표시용 (ATT-34) |
 | LeaveKind | ANNUAL, HALF_OFF |
 | LedgerEvent | ACCRUE, USE, EXPIRE, RESTORE |
-| AuditAction | CHECK_IN, CHECK_OUT, MANUAL_CHECK_OUT, REQUEST_CREATE, REQUEST_CANCEL, REQUEST_DAY_CANCEL, REQUEST_APPROVE, REQUEST_REJECT, LOGIN, LOGIN_FAIL, IP_BLOCKED, ALLOWED_IP_ADD, ALLOWED_IP_DELETE, CLOCK_CHANGE, USER_CREATE, USER_RETIRE, REQUEST_ACCESS_CHANGE |
+| AuditAction | CHECK_IN, CHECK_OUT, MANUAL_CHECK_OUT, REQUEST_CREATE, REQUEST_CANCEL, REQUEST_DAY_CANCEL, REQUEST_APPROVE, REQUEST_REJECT, LOGIN, LOGIN_FAIL, IP_BLOCKED, ALLOWED_IP_ADD, ALLOWED_IP_DELETE, CLOCK_CHANGE, USER_CREATE, USER_RETIRE, REQUEST_ACCESS_CHANGE, PASSWORD_CHANGE |
 
 SQLite는 enum 타입이 없어 문자열(TEXT)로 저장되고, 검증은 세 겹: TypeScript 타입 → API 입력(`@IsEnum`) → Prisma Client. DB 수준 강제가 필요하면 CHECK 제약조건 또는 PostgreSQL 전환.
 
@@ -328,6 +328,7 @@ backend/src/
 | --- | --- | --- | --- | --- | --- |
 | 인증 | POST | /auth/login | 로그인 `{ loginId, password }` → `{ accessToken, user }` | 모두 | FR-SYS-02 |
 | 인증 | GET | /auth/me | 내 정보와 역할 | 로그인 | FR-SYS-02 |
+| 인증 | PUT | /auth/me/password | 본인 비밀번호 변경 `{ currentPassword, newPassword }`. 새 비밀번호 8~72자, 현재와 달라야 함, 이력 `PASSWORD_CHANGE`(비밀번호는 넣지 않음) (ATT-53) | 로그인 | FR-SYS-02 |
 | 출퇴근 | GET | /attendance/today | 오늘 내 기록, 근무일 유형, 정상 퇴근 가능 시각, `pendingManualCheckouts` | 로그인 | FR-DSH-01, FR-ATT-03 |
 | 출퇴근 | POST | /attendance/check-in | 출근. **항상 즉시 기록**(서버 시각), 응답에 `pendingManualCheckouts` 포함 | 로그인 | FR-ATT-01, 04 |
 | 출퇴근 | POST | /attendance/:id/manual-check-out | 미기록 퇴근 직접 입력 `{ checkOutAt }` | 본인 | FR-ATT-03 |
@@ -455,6 +456,8 @@ backend/src/
 | CANNOT_DELETE_CURRENT_IP | 409 | 현재 접속 중인 IP 삭제 시도 |
 | CANNOT_DELETE_LAST_IP | 409 | 마지막 남은 연구실 IP 삭제 시도 |
 | DUPLICATE_LOGIN_ID | 409 | 팀원 등록 시 이미 있는 아이디 (퇴사자 포함) |
+| INVALID_CURRENT_PASSWORD | 400 | 비밀번호 변경 시 현재 비밀번호가 틀림. 401이면 화면이 로그인 만료로 보고 로그아웃시키므로 400 |
+| PASSWORD_UNCHANGED | 422 | 새 비밀번호가 현재와 같음 |
 | JOIN_DATE_IN_FUTURE | 422 | 팀원 등록 시 입사일이 오늘 이후 |
 | CANNOT_RETIRE_LEAD | 409 | 리드(본인 포함)를 퇴사 처리 |
 | DUPLICATE_ALLOWED_IP | 409 | 살아 있는 연구실 IP와 같은 IP 추가 (정규화 후 비교) |

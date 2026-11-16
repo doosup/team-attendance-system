@@ -64,6 +64,21 @@ export class InMemoryUserRepository extends UserRepository {
     return Promise.resolve();
   }
 
+  changePassword(id: number, passwordHash: string) {
+    const i = this.users.findIndex((u) => u.id === id);
+    const u = this.users[i];
+    this.users[i] = new User(
+      u.id,
+      u.loginId,
+      passwordHash,
+      u.name,
+      u.role,
+      u.joinDate,
+      u.retiredAt,
+    );
+    return Promise.resolve();
+  }
+
   private active() {
     return this.users
       .filter((u) => u.retiredAt === null)
