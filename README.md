@@ -40,6 +40,16 @@ npm test             # 단위·유스케이스 (backend)
 npm run test:e2e     # 통합: 매번 새 SQLite에 마이그레이션 후 실제 HTTP로 호출
 ```
 
+**DB 보기**
+
+```bash
+cd backend && npx prisma studio   # http://localhost:5555 에서 테이블을 표로 조회
+```
+
+DB 파일은 `backend/prisma/dev.db`(SQLite)입니다. `LeaveLedger`(잔여 원장)와 `AuditLog`(이력)에서 화면 동작이 어떻게 기록되는지 볼 수 있습니다.
+
+**처음 상태로 되돌리기:** `backend/prisma/dev.db`를 지우고 `npm run setup`을 다시 실행합니다. 시각을 미래로 옮겼다가 되돌리며 시험한 뒤 깨끗하게 다시 하고 싶을 때 씁니다.
+
 <details>
 <summary>백엔드·프런트를 따로 띄우려면</summary>
 
