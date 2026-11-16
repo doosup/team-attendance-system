@@ -87,3 +87,19 @@ export const remoteText = (
     over: total > limit ? `${total - limit}일 초과` : '',
   };
 };
+
+const dayNo = (d: string) =>
+  Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / 86_400_000;
+
+/** 신청 기간이 오늘(서버 기준)에서 얼마나 남았나: 달력 일수 D-N → D-1 → D-0 → 진행 중 → 종료 (ATT-46) */
+export function dday(
+  r: { startDate: string; endDate: string },
+  today: string,
+): { label: string; tone: '' | 'soon' | 'now' | 'over' } {
+  const n = dayNo(r.startDate) - dayNo(today);
+  if (n > 1) return { label: `D-${n}`, tone: '' };
+  if (n === 1) return { label: 'D-1', tone: 'soon' };
+  if (n === 0) return { label: 'D-0', tone: 'now' };
+  if (r.endDate >= today) return { label: '진행 중', tone: 'now' };
+  return { label: '기간 종료', tone: 'over' };
+}

@@ -9,7 +9,13 @@ import type {
   Member,
   MissingCheckout,
 } from '@/api/types';
-import { halfOffText, kstDateTime, kstTime, REQUEST_TYPE } from '@/format';
+import {
+  dday,
+  halfOffText,
+  kstDateTime,
+  kstTime,
+  REQUEST_TYPE,
+} from '@/format';
 import SettlementPanel from '@/components/SettlementPanel.vue';
 import { ACTION_LABEL, describeLog } from '@/audit-log';
 import { useClockStore } from '@/stores/clock';
@@ -107,8 +113,30 @@ const todays = computed(() =>
   ),
 );
 
+// 기간이 다 지난 대기 건: 막지는 않고(늦은 승인도 있을 수 있음) 무엇이 확정되는지 알리고 묻는다 (ATT-46)
+const LATE_APPROVE_EFFECT: Record<LeaveRequest['type'], string> = {
+  ANNUAL: '승인하면 연차 차감이 그대로 확정됩니다.',
+  HALF_OFF: '승인하면 반일 OFF 차감이 그대로 확정됩니다.',
+  REMOTE: '지난 날짜라 재택 접속 허용은 의미가 없고, 기록상 승인만 남습니다.',
+  WEEKEND_WORK:
+    '지난 날짜라 주말 근무 접속 허용은 의미가 없고, 기록상 승인만 남습니다.',
+};
+const pendingDday = (r: LeaveRequest) => {
+  const d = dday(r, clock.today);
+  return d.tone === 'over' ? { ...d, label: '기간 종료 · 처리 필요' } : d;
+};
+
 const approve = (r: LeaveRequest) =>
   guard('pending', async () => {
+    if (
+      dday(r, clock.today).tone === 'over' &&
+      !confirm(
+        `${r.userName} · ${REQUEST_TYPE[r.type]} ${period(r)} (${r.days.length}일)\n` +
+          `신청 기간이 이미 지났습니다. ${LATE_APPROVE_EFFECT[r.type]}\n` +
+          '그 날짜의 출근 기록은 바뀌지 않습니다.\n승인할까요?',
+      )
+    )
+      return;
     await api('POST', `/lead/requests/${r.id}/approve`);
     await load();
   });
@@ -245,7 +273,22 @@ const saveAccess = () =>
     <p v-if="pending.length === 0" class="muted">대기 중인 신청이 없습니다</p>
     <table v-else>
       <tbody>
-        <tr v-for="r in pending" :key="r.id">
+        <tr
+          v-for="r in pending"
+          :key="r.id"
+          :class="{ urgent: pendingDday(r).tone === 'now' }"
+        >
+          <td class="nowrap">
+            <span
+              class="tag"
+              :class="{
+                warn: pendingDday(r).tone === 'now',
+                bad: pendingDday(r).tone === 'over',
+                soon: pendingDday(r).tone === 'soon',
+              }"
+              >{{ pendingDday(r).label }}</span
+            >
+          </td>
           <td>{{ r.userName }}</td>
           <td>
             {{ REQUEST_TYPE[r.type] }}
@@ -571,6 +614,12 @@ const saveAccess = () =>
 </template>
 
 <style scoped>
+tr.urgent > td {
+  background: var(--warn-soft);
+}
+.tag.soon {
+  color: var(--warn);
+}
 .nowrap {
   white-space: nowrap;
 }
