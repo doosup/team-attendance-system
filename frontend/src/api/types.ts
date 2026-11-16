@@ -50,6 +50,15 @@ export interface HalfOff {
 }
 
 // GET /holidays — 서버 영업일 판정과 같은 공휴일 목록
+// 팀 일정 달력 (GET /dashboard/calendar): 확정 일정만 (ATT-47)
+export interface CalendarEntry {
+  date: string;
+  userId: number;
+  name: string;
+  type: RequestType;
+  halfOffPart: 'AM' | 'PM' | null;
+}
+
 export interface Holiday {
   date: string;
   name: string;

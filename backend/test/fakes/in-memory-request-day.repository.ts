@@ -100,6 +100,25 @@ export class InMemoryRequestDayRepository extends RequestDayRepository {
     );
   }
 
+  findApprovedInMonth(month: string) {
+    return Promise.resolve(
+      this.all()
+        .filter(
+          (r) =>
+            r.date.startsWith(`${month}-`) &&
+            r.requestStatus === 'APPROVED' &&
+            r.dayStatus === 'ACTIVE',
+        )
+        .sort((a, b) => a.date.localeCompare(b.date) || a.userId - b.userId)
+        .map((r) => ({
+          date: r.date,
+          userId: r.userId,
+          type: r.type,
+          halfOffPart: r.halfOffPart ?? null,
+        })),
+    );
+  }
+
   findByDate(date: string) {
     return Promise.resolve(
       this.all()

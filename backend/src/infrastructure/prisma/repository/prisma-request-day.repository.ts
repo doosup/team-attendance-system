@@ -87,6 +87,24 @@ export class PrismaRequestDayRepository extends RequestDayRepository {
     );
   }
 
+  async findApprovedInMonth(month: string) {
+    const rows = await this.tx.requestDay.findMany({
+      where: {
+        date: { startsWith: `${month}-` },
+        status: 'ACTIVE',
+        request: { status: 'APPROVED' },
+      },
+      include: { request: { select: { type: true, halfOffPart: true } } },
+      orderBy: [{ date: 'asc' }, { userId: 'asc' }],
+    });
+    return rows.map((r) => ({
+      date: r.date,
+      userId: r.userId,
+      type: r.request.type,
+      halfOffPart: r.request.halfOffPart,
+    }));
+  }
+
   async findByDate(date: string) {
     const rows = await this.tx.requestDay.findMany({
       where: { date },

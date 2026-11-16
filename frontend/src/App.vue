@@ -29,6 +29,7 @@ function logout() {
     <nav>
       <RouterLink to="/">대시보드</RouterLink>
       <RouterLink to="/requests">신청</RouterLink>
+      <RouterLink to="/calendar">팀 일정</RouterLink>
       <RouterLink v-if="auth.isLead" to="/lead">리드 관리</RouterLink>
     </nav>
     <ClockPanel />
