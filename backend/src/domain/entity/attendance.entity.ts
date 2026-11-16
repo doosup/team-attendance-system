@@ -70,16 +70,23 @@ export class Attendance {
 
   /** 리드 당일 취소로 긴급 출근이 된 날: 지각·조퇴 판정을 없앤다 (A16) */
   toEmergency(): void {
-    this.props.dayType = 'EMERGENCY_WORK';
+    this.rejudgeAs('EMERGENCY_WORK');
+  }
+
+  /** 출근 뒤에 반일 OFF가 승인된 날: 반일 OFF 사용일로 (지각 없음, 4시간 기준) (ATT-48) */
+  toHalfDayOff(requestDayId: number): void {
+    this.props.requestDayId = requestDayId;
+    this.rejudgeAs('HALF_DAY_OFF');
+  }
+
+  // 지각 판정이 없는 근무일로 바꾸고, 이미 퇴근했으면 근무시간·조퇴를 그 기준으로 다시
+  private rejudgeAs(dayType: 'EMERGENCY_WORK' | 'HALF_DAY_OFF'): void {
+    this.props.dayType = dayType;
     this.props.isLate = false;
     if (this.props.checkOutAt) {
       Object.assign(
         this.props,
-        judgeWork(
-          this.props.checkInAt,
-          this.props.checkOutAt,
-          'EMERGENCY_WORK',
-        ),
+        judgeWork(this.props.checkInAt, this.props.checkOutAt, dayType),
       );
     }
   }

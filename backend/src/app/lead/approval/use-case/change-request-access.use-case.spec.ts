@@ -1,5 +1,6 @@
 import { CustomException } from '../../../../domain/exception/custom.exception';
 import { FixedClock } from '../../../../../test/fakes/fixed-clock';
+import { InMemoryAttendanceRepository } from '../../../../../test/fakes/in-memory-attendance.repository';
 import { InMemoryAuditLogRepository } from '../../../../../test/fakes/in-memory-audit-log.repository';
 import { InMemoryLedgerRepository } from '../../../../../test/fakes/in-memory-ledger.repository';
 import { InMemoryRequestDayRepository } from '../../../../../test/fakes/in-memory-request-day.repository';
@@ -30,7 +31,12 @@ describe('리드의 재택·주말 근무 IP·시간대 변경 (ATT-42, 결정 A
       new InMemoryLedgerRepository(),
       audit,
     );
-    approve = new ApproveRequestUseCase(clock, requests, audit);
+    approve = new ApproveRequestUseCase(
+      clock,
+      requests,
+      new InMemoryAttendanceRepository(),
+      audit,
+    );
     change = new ChangeRequestAccessUseCase(clock, requests, audit);
   });
 

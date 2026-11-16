@@ -5,6 +5,7 @@ import {
 } from '../../../domain/port/request-pdf.port';
 import { kstAt } from '../../../domain/value/work-date';
 import { FixedClock } from '../../../../test/fakes/fixed-clock';
+import { InMemoryAttendanceRepository } from '../../../../test/fakes/in-memory-attendance.repository';
 import { InMemoryAuditLogRepository } from '../../../../test/fakes/in-memory-audit-log.repository';
 import { InMemoryLedgerRepository } from '../../../../test/fakes/in-memory-ledger.repository';
 import { InMemoryRequestDayRepository } from '../../../../test/fakes/in-memory-request-day.repository';
@@ -46,7 +47,12 @@ describe('신청서 PDF', () => {
       new InMemoryLedgerRepository(),
       audit,
     );
-    approve = new ApproveRequestUseCase(clock, requests, audit);
+    approve = new ApproveRequestUseCase(
+      clock,
+      requests,
+      new InMemoryAttendanceRepository(),
+      audit,
+    );
     getPdf = new GetRequestPdfUseCase(clock, requests, users, renderer);
   });
 
