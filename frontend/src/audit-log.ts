@@ -91,6 +91,8 @@ export function describeLog(
       return join(
         `${nameOf(p.applicantId)}님 ${kind(p)} ${period(p)} 승인`,
         exceptions(p),
+        // 출근 뒤에 승인된 반일 OFF: 그날 출근 기록을 반일 OFF 기준으로 다시 판정 (ATT-48)
+        p.convertedAttendance ? '이미 출근한 기록을 반일 OFF로 다시 판정' : '',
       );
     case 'REQUEST_REJECT':
       return join(

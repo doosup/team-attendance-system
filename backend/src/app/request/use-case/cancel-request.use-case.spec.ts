@@ -40,7 +40,12 @@ describe('신청 취소', () => {
       ledger,
       audit,
     );
-    approve = new ApproveRequestUseCase(clock, requests, audit);
+    approve = new ApproveRequestUseCase(
+      clock,
+      requests,
+      new InMemoryAttendanceRepository(),
+      audit,
+    );
     cancel = new CancelRequestUseCase(clock, requests, ledger, audit);
     cancelDay = new CancelRequestDayUseCase(
       clock,

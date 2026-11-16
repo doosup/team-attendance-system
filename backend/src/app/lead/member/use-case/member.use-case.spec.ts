@@ -1,5 +1,6 @@
 import { FakePasswordHasher } from '../../../../../test/fakes/fake-auth';
 import { FixedClock } from '../../../../../test/fakes/fixed-clock';
+import { InMemoryAttendanceRepository } from '../../../../../test/fakes/in-memory-attendance.repository';
 import { InMemoryAuditLogRepository } from '../../../../../test/fakes/in-memory-audit-log.repository';
 import { InMemoryLedgerRepository } from '../../../../../test/fakes/in-memory-ledger.repository';
 import { InMemoryRequestDayRepository } from '../../../../../test/fakes/in-memory-request-day.repository';
@@ -162,7 +163,12 @@ describe('팀원 등록·퇴사 처리 (결정 A19·A20)', () => {
           reason: '',
         },
       });
-      await new ApproveRequestUseCase(clock, requests, audit).execute({
+      await new ApproveRequestUseCase(
+        clock,
+        requests,
+        new InMemoryAttendanceRepository(),
+        audit,
+      ).execute({
         lead: LEAD,
         requestId: req.id,
         ip: '127.0.0.1',
