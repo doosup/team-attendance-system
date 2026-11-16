@@ -37,7 +37,8 @@ export const ERROR_MESSAGES = {
   ACCESS_CHANGE_NOT_ALLOWED:
     '재택·주말 근무 중 오늘 이후 날짜가 남은 신청만 IP·시간대를 바꿀 수 있습니다',
   REQUEST_NOT_FOUND: '신청을 찾을 수 없습니다',
-  SAME_DAY_CANCEL_LEAD_ONLY: '진행 중인 신청은 리드만 당일 취소할 수 있습니다',
+  SAME_DAY_CANCEL_LEAD_ONLY:
+    '진행 중인 신청은 본인이 취소할 수 없습니다. 오늘 하루 취소는 리드에게 요청하세요',
   NOT_SAME_DAY: '당일 취소는 오늘 날짜만 할 수 있습니다',
   DUPLICATE_ALLOWED_IP: '이미 등록된 연구실 IP입니다',
   ALLOWED_IP_NOT_FOUND: '연구실 IP를 찾을 수 없습니다',
