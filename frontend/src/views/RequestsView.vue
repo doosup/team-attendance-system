@@ -11,6 +11,7 @@ import {
   REQUEST_STATUS,
   REQUEST_TYPE,
 } from '@/format';
+import { useAuthStore } from '@/stores/auth';
 import { useClockStore } from '@/stores/clock';
 
 // 신청서 (FN-REQ-01). 쉬는 신청(휴가)과 일하는 방식 신청(근무)을 탭으로 나눈다 (ATT-33)
@@ -28,6 +29,7 @@ const tabOf = (t: RequestType): Tab =>
   t === 'ANNUAL' || t === 'HALF_OFF' ? 'LEAVE' : 'WORK';
 
 const clock = useClockStore();
+const auth = useAuthStore();
 const tab = ref<Tab>('LEAVE');
 const tabTypes = computed(() => TABS.find((t) => t.key === tab.value)!.types);
 function selectTab(key: Tab) {
@@ -77,6 +79,10 @@ const remote = computed(
 );
 const includeCanceled = ref(false);
 const error = ref('');
+// 내 신청 표의 취소·PDF 오류는 표 위에 (신청 폼 오류와 섞이지 않게)
+const listError = ref('');
+// 리드가 자기 진행 중 신청을 여기서 취소하려 하면 리드 화면의 당일 취소로 안내 (ATT-45)
+const leadCancelHint = ref(false);
 const notice = ref('');
 
 async function load() {
@@ -197,21 +203,32 @@ async function cancel(r: LeaveRequest) {
     )
   )
     return;
-  error.value = '';
+  listError.value = '';
+  leadCancelHint.value = false;
   try {
     await api('POST', `/requests/${r.id}/cancel`);
     await load();
   } catch (e) {
-    error.value = e instanceof ApiError ? e.message : '취소하지 못했습니다';
+    if (
+      auth.isLead &&
+      e instanceof ApiError &&
+      e.code === 'SAME_DAY_CANCEL_LEAD_ONLY'
+    ) {
+      leadCancelHint.value = true;
+      return;
+    }
+    listError.value = e instanceof ApiError ? e.message : '취소하지 못했습니다';
   }
 }
 
 async function pdf(r: LeaveRequest) {
-  error.value = '';
+  listError.value = '';
+  leadCancelHint.value = false;
   try {
     await download(`/requests/${r.id}/pdf`, `신청서-${r.id}.pdf`);
   } catch (e) {
-    error.value = e instanceof ApiError ? e.message : 'PDF를 받지 못했습니다';
+    listError.value =
+      e instanceof ApiError ? e.message : 'PDF를 받지 못했습니다';
   }
 }
 </script>
@@ -358,6 +375,12 @@ async function pdf(r: LeaveRequest) {
         ><input v-model="includeCanceled" type="checkbox" /> 취소 포함</label
       >
     </div>
+    <p v-if="listError" class="error" role="alert">{{ listError }}</p>
+    <p v-if="leadCancelHint" class="error" role="alert">
+      진행 중인 신청은 '내 신청'에서 취소할 수 없습니다. 오늘 하루는 리드
+      화면의 당일 취소에서 취소하세요.
+      <RouterLink to="/lead">리드 화면으로</RouterLink>
+    </p>
     <p v-if="list.length === 0" class="muted">신청이 없습니다</p>
     <table v-else>
       <thead>
