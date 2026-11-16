@@ -56,7 +56,22 @@ const canCheckIn = computed(
 const canCheckOut = computed(() => !!att.value && !att.value.checkOutAt);
 const pending = computed(() => today.value?.pendingManualCheckouts[0] ?? null);
 
+// 퇴근은 되돌릴 수 없어서, 조퇴가 되는 경우에만 한 번 더 묻는다 (ATT-49).
+// 기준 시각은 서버가 그 사람의 출근 시각·근무일 유형으로 계산한 값. 기준이 없는 날(긴급 출근·주말 근무)은 묻지 않는다.
+// 일반일 16:00 전은 서버가 어차피 거부하므로(CHECK_OUT_TOO_EARLY) 묻지 않고 그 안내를 보여 준다.
+function confirmEarlyCheckOut(): boolean {
+  const expected = today.value?.expectedCheckOutAt;
+  if (!expected || clock.serverNow >= new Date(expected)) return true;
+  const hm = kstTime(clock.serverNow.toISOString());
+  if (att.value?.dayType === 'FULL_DAY' && hm < '16:00:00') return true;
+  return confirm(
+    `아직 정상 퇴근 시각(${kstTime(expected).slice(0, 5)}) 전입니다. ` +
+      '지금 퇴근하면 조퇴로 기록되고 되돌릴 수 없습니다. 퇴근할까요?',
+  );
+}
+
 async function press(path: '/attendance/check-in' | '/attendance/check-out') {
+  if (path === '/attendance/check-out' && !confirmEarlyCheckOut()) return;
   error.value = '';
   busy.value = true;
   try {
