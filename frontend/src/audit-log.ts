@@ -25,6 +25,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   CLOCK_CHANGE: '현재 시각 변경',
   USER_CREATE: '팀원 등록',
   USER_RETIRE: '퇴사 처리',
+  PASSWORD_CHANGE: '비밀번호 변경',
   REQUEST_ACCESS_CHANGE: '접속 IP 변경',
 };
 
@@ -134,6 +135,8 @@ export function describeLog(
         Number(p.restoredHalfDays) > 0 &&
           `잔여 복원 반일 ${s(p.restoredHalfDays)}개분 (연차 1일 = 반일 2개)`,
       );
+    case 'PASSWORD_CHANGE':
+      return `${s(p.loginId)} 본인 비밀번호 변경`;
     default:
       return JSON.stringify(p);
   }

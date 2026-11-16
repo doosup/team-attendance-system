@@ -18,4 +18,6 @@ export abstract class UserRepository {
   // loginId는 퇴사자 포함 유일: 겹치면 DUPLICATE_LOGIN_ID (결정 A19)
   abstract create(user: NewUser): Promise<User>;
   abstract retire(id: number, at: Date): Promise<void>;
+  // 본인 비밀번호 변경 (해시만 저장, ATT-53)
+  abstract changePassword(id: number, passwordHash: string): Promise<void>;
 }

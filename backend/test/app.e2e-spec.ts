@@ -88,6 +88,8 @@ describe('핵심 흐름 (e2e)', () => {
         .post(path)
         .set('authorization', `Bearer ${tokens[who]}`)
         .send(body ?? {}),
+    put: (path: string) =>
+      request(http).put(path).set('authorization', `Bearer ${tokens[who]}`),
     delete: (path: string) =>
       request(http).delete(path).set('authorization', `Bearer ${tokens[who]}`),
   });
@@ -274,5 +276,31 @@ describe('핵심 흐름 (e2e)', () => {
   it('팀원이 리드 API를 부르면 403 FORBIDDEN_ROLE', async () => {
     const res = await as('kim').get('/lead/requests').expect(403);
     expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('본인 비밀번호 변경: 짧으면 400, 현재 비밀번호가 틀리면 400(로그아웃되지 않게), 바꾸면 새 비밀번호로만 로그인 (ATT-53)', async () => {
+    const short = await as('kim')
+      .put('/auth/me/password')
+      .send({ currentPassword: 'password123', newPassword: 'short' })
+      .expect(400);
+    expect(short.body.error.code).toBe('VALIDATION_FAILED');
+    const wrong = await as('kim')
+      .put('/auth/me/password')
+      .send({ currentPassword: 'nope', newPassword: 'new-password-1' })
+      .expect(400);
+    expect(wrong.body.error.code).toBe('INVALID_CURRENT_PASSWORD');
+
+    await as('kim')
+      .put('/auth/me/password')
+      .send({ currentPassword: 'password123', newPassword: 'new-password-1' })
+      .expect(200);
+    await request(http)
+      .post('/auth/login')
+      .send({ loginId: 'kim', password: 'password123' })
+      .expect(401);
+    await request(http)
+      .post('/auth/login')
+      .send({ loginId: 'kim', password: 'new-password-1' })
+      .expect(200);
   });
 });
