@@ -120,12 +120,11 @@ const partText = (e: CalendarEntry) =>
     </p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
 
-    <div class="grid-cal" role="table" :aria-label="`${title} 팀 일정`">
-      <div class="week" role="row">
+    <div class="grid-cal" role="group" :aria-label="`${title} 팀 일정`">
+      <div class="week" aria-hidden="true">
         <div
           v-for="(w, i) in WEEK"
           :key="w"
-          role="columnheader"
           :class="{ sun: i === 0, sat: i === 6 }"
         >
           {{ w }}
@@ -138,7 +137,6 @@ const partText = (e: CalendarEntry) =>
             v-else
             class="cell"
             :class="{ today: c.date === clock.today }"
-            role="cell"
           >
             <div class="date">
               <span
