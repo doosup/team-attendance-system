@@ -41,10 +41,20 @@ export function balanceOf(
     entries
       .filter((e) => e.props.kind === kind && counts(e, today))
       .reduce((acc, e) => acc + e.props.halfDays, 0);
-  return { annual: sum('ANNUAL'), halfOff: sum('HALF_OFF') };
+  // OFF는 지급분별로 센다: 만료가 빼는 양이 "그때 남은 만큼"이라 행을 그대로 더하면 안 된다 (ATT-50)
+  const halfOff = offGrants(entries, today).reduce(
+    (acc, g) => acc + g.remaining,
+    0,
+  );
+  return { annual: sum('ANNUAL'), halfOff };
 }
 
-/** OFF 지급분별 남은 수 (만료 임박 순) */
+/**
+ * OFF 지급분별 남은 수 (만료 임박 순). 지급일이 온 지급분만.
+ * 만료 기록은 "이 지급분은 끝났다"는 표시로만 보고, 빼는 양은 그 시점에 남은 만큼(=남은 수를 0으로)이다.
+ * 저장된 만료 양을 그대로 빼면, 시계를 미래로 옮겨 만료가 기록된 뒤 과거로 돌아와 같은 OFF를 썼을 때
+ * 만료와 사용이 겹쳐 음수가 된다 (ATT-50).
+ */
 export function offGrants(
   entries: LedgerEntry[],
   today: string,
@@ -56,15 +66,21 @@ export function offGrants(
         e.props.event === 'ACCRUE' &&
         e.props.effectiveDate <= today,
     )
-    .map((g) => ({
-      grantId: g.props.id,
-      expiresOn: g.props.expiresOn ?? '',
-      remaining:
-        g.props.halfDays +
-        entries
-          .filter((e) => e.props.grantId === g.props.id && counts(e, today))
-          .reduce((acc, e) => acc + e.props.halfDays, 0),
-    }))
+    .map((g) => {
+      const mine = entries.filter((e) => e.props.grantId === g.props.id);
+      const used = mine
+        .filter((e) => e.props.event === 'USE' || e.props.event === 'RESTORE')
+        .reduce((acc, e) => acc + e.props.halfDays, 0);
+      const expired = mine.some(
+        (e) => e.props.event === 'EXPIRE' && e.props.effectiveDate <= today,
+      );
+      const left = g.props.halfDays + used;
+      return {
+        grantId: g.props.id,
+        expiresOn: g.props.expiresOn ?? '',
+        remaining: expired ? Math.min(left, 0) : left,
+      };
+    })
     .sort(
       (a, b) => a.expiresOn.localeCompare(b.expiresOn) || a.grantId - b.grantId,
     );
@@ -107,11 +123,8 @@ export function dueEvents(
   const expiries: LedgerDraft[] = offGrants(existing, today)
     .filter((g) => g.expiresOn < today && g.remaining > 0)
     .map((g) => {
-      // 같은 지급분이 만료 후 복원되면 다시 만료될 수 있어 회차를 키에 넣는다
-      const nth =
-        existing.filter(
-          (e) => e.props.grantId === g.grantId && e.props.event === 'EXPIRE',
-        ).length + 1;
+      // 지급분마다 한 번: 만료 뒤에 복원돼도 만료 표시가 남은 수를 0으로 보므로 다시 만들 일이 없다 (ATT-50).
+      // 키 끝의 회차(:1)는 기존 데이터와 맞추려고 둔다
       return {
         ...base,
         kind: 'HALF_OFF' as const,
@@ -119,7 +132,7 @@ export function dueEvents(
         halfDays: -g.remaining,
         effectiveDate: addDays(g.expiresOn, 1),
         grantId: g.grantId,
-        dedupKey: `EXPIRE:HALF_OFF:${g.grantId}:${nth}`,
+        dedupKey: `EXPIRE:HALF_OFF:${g.grantId}:1`,
       };
     });
 
