@@ -1,6 +1,7 @@
 import { Attendance } from '../entity/attendance.entity';
 import { LedgerEntry } from '../entity/ledger-entry.entity';
 import { lastDayOfMonth } from '../value/work-date';
+import { offGrants } from './balance.policy';
 
 /** 그 달에 재직한 날이 있나: 입사일 ≤ 말일, 퇴사일(KST 날짜) ≥ 1일 (결정 A20) */
 export const employedIn = (
@@ -71,6 +72,10 @@ export function settleMonth(
     annualUsedDays: -sumLedger('ANNUAL', usedIn) / 2,
     halfOffUsed: -sumLedger('HALF_OFF', usedIn),
     annualBalanceDays: sumLedger('ANNUAL', until) / 2,
-    halfOffBalance: sumLedger('HALF_OFF', until),
+    // 지급분별로: 만료가 빼는 양은 그때 남은 만큼 (balance.policy, ATT-50)
+    halfOffBalance: offGrants(
+      entries.filter((e) => until(e.props)),
+      asOf,
+    ).reduce((acc, g) => acc + g.remaining, 0),
   };
 }

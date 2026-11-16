@@ -242,3 +242,84 @@ describe('복원 restoreDrafts (반려·취소된 날짜만, 원래 지급분·�
     expect(restoreDrafts([], [21, 22])).toEqual([]);
   });
 });
+
+// 만료가 빼는 양은 저장된 숫자가 아니라 "만료일이 온 그 시점에 남은 만큼" (ATT-50).
+// 시계를 미래로 옮겨 만료가 기록된 뒤 과거로 돌아와 같은 OFF를 써도 음수가 되지 않게
+describe('시계를 앞뒤로 옮겨도 OFF 잔여는 음수가 되지 않는다 (ATT-50)', () => {
+  // 11/21 지급(12/21까지) → 미래(1/4)에서 만료 기록(-1, 12/22) → 과거(12/16)로 와서 12/21 사용
+  const timeTravel = () => [
+    offGrant(100, '2026-11-21'),
+    entry({
+      kind: 'HALF_OFF',
+      event: 'EXPIRE',
+      halfDays: -1,
+      effectiveDate: '2026-12-22',
+      grantId: 100,
+      dedupKey: 'EXPIRE:HALF_OFF:100:1',
+    }),
+    entry({
+      kind: 'HALF_OFF',
+      event: 'USE',
+      halfDays: -1,
+      effectiveDate: '2026-12-21',
+      grantId: 100,
+    }),
+  ];
+
+  it('만료 기록 뒤에 과거 시점에서 같은 OFF를 썼으면, 만료 이후에도 잔여는 0이다 (-1 아님)', () => {
+    expect(balanceOf(timeTravel(), '2026-12-23').halfOff).toBe(0);
+    expect(offGrants(timeTravel(), '2026-12-23')[0].remaining).toBe(0);
+  });
+
+  it('만료일 전으로 돌아가면 그 사용만 반영해 0이다', () => {
+    expect(balanceOf(timeTravel(), '2026-12-16').halfOff).toBe(0);
+  });
+
+  it('쓰지 않은 OFF는 만료일 다음 날부터 남은 만큼 사라진다 (평소와 같음)', () => {
+    const entries = [
+      offGrant(100, '2026-11-21'),
+      entry({
+        kind: 'HALF_OFF',
+        event: 'EXPIRE',
+        halfDays: -1,
+        effectiveDate: '2026-12-22',
+        grantId: 100,
+      }),
+    ];
+    expect(balanceOf(entries, '2026-12-21').halfOff).toBe(1);
+    expect(balanceOf(entries, '2026-12-22').halfOff).toBe(0);
+  });
+
+  it('지급일 전으로 되돌리면 그 지급분과 그것을 쓴 기록이 함께 빠져 음수가 아니다', () => {
+    const entries = [
+      offGrant(100, '2026-11-21'),
+      entry({
+        kind: 'HALF_OFF',
+        event: 'USE',
+        halfDays: -1,
+        effectiveDate: '2026-11-24',
+        grantId: 100,
+      }),
+    ];
+    expect(balanceOf(entries, '2026-11-20').halfOff).toBe(0);
+  });
+
+  it('만료된 OFF가 나중에 복원돼도 다시 쓸 수 없고 만료 이벤트를 또 만들지 않는다', () => {
+    const entries = [
+      ...timeTravel(),
+      entry({
+        kind: 'HALF_OFF',
+        event: 'RESTORE',
+        halfDays: 1,
+        effectiveDate: '2026-12-21',
+        grantId: 100,
+      }),
+    ];
+    expect(balanceOf(entries, '2026-12-23').halfOff).toBe(0);
+    expect(
+      dueEvents(2, '2026-11-15', entries, '2026-12-23').filter(
+        (d) => d.kind === 'HALF_OFF',
+      ),
+    ).toEqual([]);
+  });
+});

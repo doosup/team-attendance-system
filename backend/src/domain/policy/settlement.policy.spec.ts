@@ -186,4 +186,39 @@ describe('월별 정산 settleMonth', () => {
       halfOffBalance: 1,
     });
   });
+
+  it('OFF 잔여도 지급분별로 세어, 만료와 과거 시점 사용이 겹쳐도 음수가 아니다 (ATT-50)', () => {
+    const r = settleMonth(
+      '2026-12',
+      '2027-01-04',
+      [],
+      [
+        entry({
+          id: 100,
+          kind: 'HALF_OFF',
+          event: 'ACCRUE',
+          halfDays: 1,
+          effectiveDate: '2026-11-21',
+          expiresOn: '2026-12-21',
+        }),
+        entry({
+          id: 101,
+          kind: 'HALF_OFF',
+          event: 'EXPIRE',
+          halfDays: -1,
+          effectiveDate: '2026-12-22',
+          grantId: 100,
+        }),
+        entry({
+          id: 102,
+          kind: 'HALF_OFF',
+          event: 'USE',
+          halfDays: -1,
+          effectiveDate: '2026-12-21',
+          grantId: 100,
+        }),
+      ],
+    );
+    expect(r).toMatchObject({ halfOffUsed: 1, halfOffBalance: 0 });
+  });
 });
