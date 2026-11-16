@@ -6,6 +6,7 @@ import { ko } from 'date-fns/locale';
 import { api, ApiError, download } from '@/api/client';
 import type { Balance, Holiday, LeaveRequest, RequestType } from '@/api/types';
 import {
+  dday,
   kstDateTime,
   remoteText,
   REQUEST_STATUS,
@@ -78,6 +79,12 @@ const remote = computed(
     remoteText(balance.value.remote, balance.value.remote.limit),
 );
 const includeCanceled = ref(false);
+// 살아 있는 신청만 남은 날을 붙인다. 지난 건은 처리할 게 없으니 흐리게 (ATT-46)
+const ddayOf = (r: LeaveRequest) => {
+  if (r.status !== 'PENDING' && r.status !== 'APPROVED') return null;
+  const d = dday(r, clock.today);
+  return d.tone === 'over' ? { ...d, label: '지난 신청' } : d;
+};
 const error = ref('');
 // 내 신청 표의 취소·PDF 오류는 표 위에 (신청 폼 오류와 섞이지 않게)
 const listError = ref('');
@@ -414,6 +421,16 @@ async function pdf(r: LeaveRequest) {
             }}<template v-if="r.endDate !== r.startDate">
               ~ {{ r.endDate }}</template
             >
+            <div v-if="ddayOf(r)">
+              <span
+                class="tag"
+                :class="{
+                  warn: ddayOf(r)!.tone === 'now',
+                  past: ddayOf(r)!.tone === 'over',
+                }"
+                >{{ ddayOf(r)!.label }}</span
+              >
+            </div>
           </td>
           <td>
             {{ REQUEST_STATUS[r.status] }}
@@ -450,6 +467,10 @@ async function pdf(r: LeaveRequest) {
 </template>
 
 <style scoped>
+.tag.past {
+  color: var(--muted);
+  background: none;
+}
 .tabs {
   display: flex;
   gap: 4px;
