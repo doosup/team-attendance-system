@@ -345,6 +345,46 @@ erDiagram
 
 ---
 
+## 12. 제출 후: 실제 팀에서 쓰기 위한 배포 (AWS)
+
+과제 제출본(`submission` 태그) 뒤에 실제로 쓰려고 세 단계로 옮겼습니다.
+
+| 티켓 | 한 일 |
+|---|---|
+| ATT-55 | SQLite → **PostgreSQL**(로컬은 Docker). 도메인·유스케이스 코드는 그대로 (ADR-008) |
+| ATT-56 | backend·web(nginx)·db를 **Docker Compose** 한 줄로. 설정은 `.env`에서 받고, 빠지면 시작 거부 |
+| ATT-57 | **AWS EC2**에 같은 compose로 배포. 비밀값은 **Secrets Manager** |
+
+```mermaid
+flowchart LR
+    B[브라우저] -->|HTTP 80| EIP[Elastic IP]
+    subgraph EC2["EC2 t4g.small (Ubuntu, Docker)"]
+        W[web: nginx] --> API[backend: NestJS] --> DB[(db: PostgreSQL)]
+    end
+    EIP --> W
+    SM[Secrets Manager<br/>attendance/prod] -. IAM 역할로 읽기 .-> EC2
+    ME[운영자 맥] -. SSM 원격 명령 .-> EC2
+```
+
+- **비밀값:** `JWT_SECRET`·`DB_PASSWORD`·`SEED_PASSWORD`(첫 비밀번호)·`LAB_IP`(첫 연구실 공인 IP)를 Secrets Manager 비밀 하나에 둔다. EC2는 **이 비밀만 읽는 IAM 역할**로 꺼내 `.env`(권한 600)를 만든다. 서버·저장소 어디에도 키를 두지 않는다.
+- **접속 경로:** 방화벽은 80번만 연다. SSH 포트는 열지 않고, 운영 명령은 **SSM**으로 보낸다. 루트 계정은 MFA만 걸고 쓰지 않으며, 작업은 IAM 사용자로 한다.
+- **IP 판정:** 리눅스 Docker는 접속 IP를 그대로 넘기고 nginx가 `X-Forwarded-For`를 그 값으로 덮어써, 다른 곳에서 연구실 IP인 척 헤더를 보내도 실제 IP로 403이 난다(배포 서버에서 확인).
+- **첫 실행 뒤:** 연구실 IP 변경은 리드 화면의 IP 관리에서 한다(DB가 기준). 시드는 재시작해도 바꾼 비밀번호·지운 IP를 되돌리지 않는다.
+
+**배포·재배포** (운영자 맥, AWS CLI 로그인 후)
+
+```bash
+# 서버 첫 부팅 설치는 deploy/ec2-setup.sh (EC2 user-data). 이후 배포·재배포는 이 명령 하나
+aws ssm send-command --instance-ids <인스턴스 ID> --document-name AWS-RunShellScript \
+  --parameters 'commands=["export PATH=$PATH:/snap/bin","bash /opt/attendance/deploy/ec2-start.sh main"]'
+```
+
+**정리(비용 멈추기):** EC2 종료(Terminate) → Elastic IP 릴리스 → Secrets Manager 비밀 삭제 → IAM 역할·보안 그룹 삭제. 켜 두는 동안의 비용은 EC2·공인 IPv4·디스크·비밀 1개다.
+
+**남은 일:** 도메인 연결 후 HTTPS(nginx + Let's Encrypt). 지금은 HTTP라 비밀번호가 암호화되지 않고 전송된다. DB 자동 백업. 실제 연구실 IP로 교체.
+
+---
+
 ## 문서
 
 | 문서 | 내용 |
