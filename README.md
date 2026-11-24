@@ -18,7 +18,7 @@
 ```bash
 git clone https://github.com/doosup/team-attendance-system.git && cd team-attendance-system
 npm i            # 루트에서 한 번: backend·frontend 의존성까지 설치
-npm run setup    # Postgres 상자 실행 → .env 생성 → DB 마이그레이션 → 시드 데이터
+npm run setup    # 설정 메모(.env) 생성 → Postgres 상자 실행 → DB 마이그레이션 → 시드 데이터
 npm run dev      # 백엔드 http://localhost:3000 + 프런트 http://localhost:5173
 ```
 
@@ -51,6 +51,18 @@ cd backend && npx prisma studio   # http://localhost:5555 에서 테이블을 �
 DB는 Docker의 PostgreSQL(`localhost:5432`, DB `attendance`)입니다. 터미널에서 SQL로 보려면 `docker compose exec db psql -U attendance`. `LeaveLedger`(잔여 원장)와 `AuditLog`(이력)에서 화면 동작이 어떻게 기록되는지 볼 수 있습니다.
 
 **처음 상태로 되돌리기:** `docker compose down -v`(Postgres 상자와 데이터 삭제) 후 `npm run setup`을 다시 실행합니다. 시각을 미래로 옮겼다가 되돌리며 시험한 뒤 깨끗하게 다시 하고 싶을 때 씁니다.
+
+**Docker로 한 번에 실행 (배포와 같은 방식)**
+
+```bash
+npm run setup                  # 처음 한 번: 루트 .env(Docker용 설정 메모)를 시험값으로 만든다
+docker compose up -d --build   # db(PostgreSQL) + backend(NestJS) + web(nginx + 화면) 상자 3개
+# → http://localhost:8080   (끄기: docker compose down)
+```
+
+배포 서버와 같은 구성이라 운영 모드(`NODE_ENV=production`)로 뜨고 시계 변경 버튼은 없습니다. nginx가 화면을 주고 `/api`를 백엔드로 넘기며, 접속 IP는 nginx가 본 값으로 덮어써서 브라우저가 보낸 `X-Forwarded-For` 위조는 무시됩니다. 맥에서 접속하면 Docker가 IP를 내부망 관문 주소 `172.30.0.1`로 바꿔 넘기므로 이 주소도 연구실 IP로 시드됩니다. 위 `npm run dev`와 같은 DB를 씁니다.
+
+값은 루트 `.env`(깃에 안 올라감)에서 읽습니다. `JWT_SECRET`, `SEED_PASSWORD`(첫 비밀번호), `LAB_IP`(처음 세울 때 넣을 연구실 공인 IP, 쉼표로 여러 개)가 없으면 시험값으로 켜지지 않고 멈춥니다. 서버에서는 이 파일을 비공개 값으로 만듭니다. 시드는 켤 때마다 돌지만 이미 있는 계정(바꾼 비밀번호 포함)은 건드리지 않고, 연구실 IP는 허용 목록이 비었을 때만 넣습니다. 그 뒤 연구실 IP 변경은 리드 화면의 IP 관리에서 합니다.
 
 <details>
 <summary>백엔드·프런트를 따로 띄우려면</summary>

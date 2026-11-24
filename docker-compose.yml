@@ -1,11 +1,15 @@
-# 로컬 개발용 PostgreSQL. `npm run setup`이 db 서비스를 띄운다.
-# 계정·비밀번호는 내 노트북 전용 기본값이다. 서버 배포 값은 Secrets Manager에서 받는다 (ATT-57).
+# 상자 3개: db(PostgreSQL) · backend(NestJS) · web(nginx + Vue 화면)
+# - 개발: `npm run setup`이 db만 띄우고, 앱은 `npm run dev`로 맥에서 실행
+# - 한 번에 실행: `docker compose up -d --build` → http://localhost:8080
+# 값은 같은 폴더의 .env(설정 메모, 깃에 안 올라감)에서 읽는다. 내 맥은 npm run setup이 시험값으로 만들고,
+# 서버(EC2)는 Secrets Manager 값으로 직접 만든다. 필수 값이 없으면 시험값으로 켜지지 않고 멈춘다
 services:
   db:
     image: postgres:17
     environment:
       POSTGRES_USER: attendance
-      POSTGRES_PASSWORD: attendance
+      # DB는 밖에 열리지 않아(아래 127.0.0.1, 내부망) 로컬은 기본값. 서버는 .env에 DB_PASSWORD
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-attendance}
       POSTGRES_DB: attendance
     # 같은 컴퓨터에서만 접속 (다른 기기에서 DB 포트로 직접 붙지 못하게)
     ports:
@@ -17,6 +21,47 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://attendance:${DB_PASSWORD:-attendance}@db:5432/attendance
+      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET이 필요합니다}
+      # 시드: 첫 비밀번호, 처음 세울 때 넣을 연구실 IP(서버가 본 공인 IP, 쉼표로 여러 개)
+      SEED_PASSWORD: ${SEED_PASSWORD:?.env에 SEED_PASSWORD가 필요합니다}
+      LAB_IP: ${LAB_IP:?.env에 LAB_IP가 필요합니다}
+      # 앞단 nginx가 같은 내부망(사설 IP)에 있어 그 X-Forwarded-For만 믿는다
+      TRUST_PROXY: uniquelocal
+    depends_on:
+      db:
+        condition: service_healthy
+    # 응답이 오면(500 미만) 준비 완료. 그 전엔 web이 기다려서 켜자마자 502가 나지 않는다
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.status < 500 ? 0 : 1), () => process.exit(1))"
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    # 포트를 밖에 열지 않는다: nginx만 내부망으로 접근
+
+  web:
+    build: ./frontend
+    ports:
+      # 기본은 내 맥에서만 열기. 서버는 .env에 WEB_PORT=80
+      - '${WEB_PORT:-127.0.0.1:8080}:80'
+    depends_on:
+      backend:
+        condition: service_healthy
+
+# 내부망 대역 고정: 맥에서 접속하면 관문 주소가 항상 172.30.0.1 (로컬 LAB_IP 시험값)
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
 
 volumes:
   db-data:
