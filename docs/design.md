@@ -301,14 +301,14 @@ backend/src/
 | --- | --- | --- | --- |
 | 단위 | domain의 policy·entity ("10:00:01은 지각", "금~월 연차는 2일 차감") | 필요 없음 (순수 함수) | 약 70% |
 | 유스케이스 | app의 use-case 흐름 | 필요 없음 (`InMemoryXRepository` 또는 jest mock) | 약 20% |
-| 통합(e2e) | 실제 API → 가드 → Prisma → SQLite | 테스트용 SQLite 파일 | 약 10%, 핵심 흐름만 |
+| 통합(e2e) | 실제 API → 가드 → Prisma → PostgreSQL | 테스트 전용 DB `attendance_e2e` (SQLite 시절엔 파일) | 약 10%, 핵심 흐름만 |
 
 통합 테스트 핵심 흐름: 출근 → 퇴근 → 판정 / 신청 → 승인 → 원장 차감 → 취소 → 복원 / 허용되지 않은 IP는 403 / 미기록 퇴근이 남으면 퇴근 거부
 
 - 실행: `npm run test`(단위·유스케이스), `npm run test:e2e`(통합, `test/app.e2e-spec.ts`)
-- e2e는 `DATABASE_URL=file:./e2e.db`로 매번 새 DB에 마이그레이션 후 AppModule 전체(가드·트랜잭션·Prisma)를 띄워 HTTP로 호출. `main.ts`와 같은 설정(`configure-app.ts`)을 쓴다
+- e2e는 같은 Postgres 서버의 `attendance_e2e` DB를 매번 지우고 새로 만든 뒤 마이그레이션하고, AppModule 전체(가드·트랜잭션·Prisma)를 띄워 HTTP로 호출. `main.ts`와 같은 설정(`configure-app.ts`)을 쓴다
 - 유스케이스 테스트는 `test/fakes/`의 메모리 저장소·고정 시계를 쓰고, `@Transactional()`은 `test/setup-unit.ts`에서 통과시킨다 (실제 트랜잭션은 e2e·수동 롤백 확인으로)
-- DB 경로는 `DATABASE_URL`(setup이 `backend/.env`에 `file:./dev.db`로 생성)
+- DB 주소는 `DATABASE_URL`(setup이 `backend/.env`에 로컬 Docker Postgres 주소로 생성)
 
 경계값 테스트 필수: 06:59:59/07:00:00, 10:00:00/10:00:01, 15:59:59/16:00:00, 17:00:00/17:00:01
 
@@ -473,7 +473,7 @@ backend/src/
 
 ## ADR (설계 결정 기록)
 
-### ADR-001 DB: SQLite + Prisma
+### ADR-001 DB: SQLite + Prisma (과제 제출본, ADR-008로 대체)
 - **결정:** SQLite 파일 DB, ORM은 Prisma
 - **이유:** 평가자가 별도 설치 없이 실행 가능 (과제 필수 조건). Prisma 스키마는 읽기 쉽고 `prisma studio`로 데이터를 바로 볼 수 있음. Prisma 6.2+는 SQLite에서도 enum·Json 지원
 - **대안:** PostgreSQL + Docker (평가자 환경에 Docker 필요), JSON 파일 (조회·제약조건을 직접 구현해야 함)
@@ -512,3 +512,10 @@ backend/src/
 - **이유:** **의존성 역전 원칙(DIP).** 업무 규칙(domain)이 세부 도구(Prisma·Nest)에 기대지 않고 둘 다 약속(인터페이스)에 기대게 함. domain에는 프레임워크 import가 없어 "이 팀의 근태 제도"만 코드로 남고, ORM·DB를 바꾸거나(SQLite → PostgreSQL) 버전을 올려도 domain은 그대로. 테스트는 jest mock 또는 메모리 가짜 저장소 모두 가능하며, 가짜 저장소는 상태를 기억해 "저장 → 조회" 흐름 테스트가 자연스러움
 - **대안:** domain의 저장소 클래스가 PrismaService를 직접 사용 → 파일이 적고 익숙하며 유스케이스 테스트도 jest mock으로 가능(테스트 가능성은 차이 없음). 다만 domain이 Prisma를 import해 DB·ORM 교체 시 domain도 수정해야 하고 헥사고날 원칙과 어긋남. 실용적 타협으로는 타당하지만, 이번에는 설계 의도를 끝까지 일관되게 지키는 쪽을 선택
 - **감수한 점:** 저장소마다 인터페이스 파일 하나 추가. Prisma 쿼리 자체의 정확성은 통합 테스트로 확인
+
+### ADR-008 DB: SQLite → PostgreSQL (제출 후 실사용 준비, ATT-55)
+- **결정:** 과제 제출본(`submission` 태그)은 SQLite로 두고, main은 PostgreSQL 17로 옮긴다. 로컬은 `docker-compose.yml`의 `db` 서비스로 띄운다
+- **이유:** 실제 팀에서 쓰면 여러 명이 동시에 쓴다. SQLite는 쓰기를 한 번에 하나씩만 처리하고 enum·부분 인덱스를 DB가 강제하지 못한다. PostgreSQL은 enum을 DB 타입으로 만들고(`CREATE TYPE`) 조건부 유일 제약(부분 인덱스)도 지원한다. ADR-007 덕분에 바뀐 곳은 스키마 provider·마이그레이션·접속 주소·e2e 준비 코드뿐이고 domain·use-case는 그대로다
+- **마이그레이션:** SQLite용 SQL은 그대로 쓸 수 없어 Postgres용 `init` 하나로 새로 만들었다. 이전 이력은 `submission` 태그에 남는다. 옮길 운영 데이터가 없어 데이터 이전은 하지 않았다
+- **대안:** RDS 같은 관리형 DB → 백업을 맡길 수 있지만 지금 규모·예산에 과함. 배포 단계(ATT-57)에서 EC2 한 대의 Docker로 시작
+- **감수한 점:** 로컬 실행에 Docker Desktop이 필요해 "clone → 바로 실행"이 한 단계 늘었다. 동시성 기본값이 SQLite의 직렬 쓰기에서 PostgreSQL의 READ COMMITTED로 바뀌어, 중복 신청 같은 "확인 후 쓰기"는 부분 유일 인덱스로 DB가 직접 막는 것이 다음 단계

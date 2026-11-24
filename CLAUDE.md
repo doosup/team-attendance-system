@@ -6,7 +6,7 @@
 > **작업을 시작하기 전에 `docs/workflow.md`를 먼저 읽는다.** 진행 현황, 티켓 순서, 티켓 하나의 작업 순서, 스킬 사용 시점이 정리되어 있다.
 
 ## 기술 스택
-- backend/: NestJS (TypeScript), Prisma(6.2+), SQLite (`backend/prisma/dev.db`, gitignore)
+- backend/: NestJS (TypeScript), Prisma(6.2+), PostgreSQL 17 (로컬은 `docker-compose.yml`의 db 서비스. 과제 제출본 SQLite는 `submission` 태그, ADR-008)
 - frontend/: Vue 3 (TypeScript, Vite, Pinia, Vue Router)
 - 테스트: Jest (backend). 정책 로직은 반드시 단위 테스트
 - 날짜: dayjs + utc/timezone 플러그인. 날짜는 `YYYY-MM-DD`(KST) 문자열, 순간은 UTC DateTime, 판정·표시 Asia/Seoul
@@ -56,7 +56,7 @@ common/
 - 저장소: use-case는 `domain/repository`의 abstract class만 주입받음. 구현 연결은 `repository.module.ts`에서 `{ provide: XRepository, useClass: PrismaXRepository }`
 - 트랜잭션: use-case에 `@Transactional()` (nestjs-cls + Prisma 어댑터). 한 요청의 여러 저장소가 같은 트랜잭션 사용
 - 조회: 팀 보드·미기록 목록·정산은 저장소 조회 + 순수 정책(board.policy, settlement.policy)으로 (app이 infrastructure를 import하지 않게)
-- 테스트 3층: ① policy·entity 순수 단위 테스트(약 70%) ② use-case는 `InMemoryXRepository` 가짜 저장소로(약 20%) ③ 통합(e2e)은 테스트용 SQLite로 핵심 흐름만(약 10%: 출근→퇴근 판정, 신청→승인→차감→취소→복원, IP 403, 미기록 퇴근 시 퇴근 거부). `*.spec.ts`는 대상 파일 옆, e2e는 `test/`
+- 테스트 3층: ① policy·entity 순수 단위 테스트(약 70%) ② use-case는 `InMemoryXRepository` 가짜 저장소로(약 20%) ③ 통합(e2e)은 테스트 전용 Postgres DB(`attendance_e2e`)로 핵심 흐름만(약 10%: 출근→퇴근 판정, 신청→승인→차감→취소→복원, IP 403, 미기록 퇴근 시 퇴근 거부). `*.spec.ts`는 대상 파일 옆, e2e는 `test/`
 
 ## 데이터 모델 (상세·근거는 `docs/design.md`)
 - User / Attendance / Request / RequestDay / LeaveLedger / AuditLog / AllowedIp
