@@ -1,10 +1,10 @@
-// 통합 테스트: 실제 API → 가드 → 트랜잭션 → Prisma → 테스트용 SQLite (CLAUDE.md 핵심 흐름 4개)
+// 통합 테스트: 실제 API → 가드 → 트랜잭션 → Prisma → 테스트용 Postgres DB (CLAUDE.md 핵심 흐름 4개)
+// 로컬 Docker Postgres(docker compose up -d db)가 떠 있어야 한다. 개발 DB와 섞이지 않게 attendance_e2e를 쓴다
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcrypt';
 import { execSync } from 'node:child_process';
-import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -13,7 +13,9 @@ import { configureApp } from '../src/configure-app';
 
 // 아래 환경변수는 앱을 조립하는 beforeAll(Prisma 연결·JWT 설정) 전에만 정해지면 된다
 
-process.env.DATABASE_URL = 'file:./e2e.db';
+process.env.DATABASE_URL =
+  process.env.E2E_DATABASE_URL ??
+  'postgresql://attendance:attendance@localhost:5432/attendance_e2e';
 process.env.JWT_SECRET = 'e2e-secret';
 const BACKEND = join(__dirname, '..');
 
@@ -25,13 +27,23 @@ describe('핵심 흐름 (e2e)', () => {
   const tokens: Record<string, string> = {};
 
   beforeAll(async () => {
-    for (const f of ['e2e.db', 'e2e.db-journal']) {
-      rmSync(join(BACKEND, 'prisma', f), { force: true });
-    }
+    // 매번 빈 DB에서 시작 (SQLite 시절 e2e.db 파일을 지우던 것과 같다). 지우는 대상은 e2e 전용 DB뿐
+    const e2eUrl = new URL(process.env.DATABASE_URL!);
+    const e2eDb = e2eUrl.pathname.slice(1);
+    if (!e2eDb.endsWith('_e2e'))
+      throw new Error(`e2e 전용 DB가 아님: ${e2eDb}`);
+    const adminUrl = new URL(e2eUrl);
+    adminUrl.pathname = '/postgres';
+    const admin = new PrismaClient({ datasourceUrl: adminUrl.toString() });
+    await admin.$executeRawUnsafe(
+      `DROP DATABASE IF EXISTS "${e2eDb}" WITH (FORCE)`,
+    );
+    await admin.$executeRawUnsafe(`CREATE DATABASE "${e2eDb}"`);
+    await admin.$disconnect();
     // jest 안의 process.env 변경은 자식 프로세스에 자동으로 넘어가지 않아 env를 명시한다
     execSync('npx prisma migrate deploy', {
       cwd: BACKEND,
-      env: { ...process.env, DATABASE_URL: 'file:./e2e.db' },
+      env: { ...process.env },
       stdio: 'ignore',
     });
 

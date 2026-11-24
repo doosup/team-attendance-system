@@ -3,20 +3,22 @@
 하이컨시 과제 **지정 주제 2**. 리드 1명과 팀원 3명이 쓰는 내부 근태관리 웹앱입니다.
 과제의 요구사항(FR) 13개, 즉 필수 10개(출퇴근·지각·조퇴, 미기록 퇴근, 신청·잔여, IP 제한, 팀 보드, 이력 등)와 선택 3개(승인·반려, 신청서 PDF, 월별 정산)를 구현했습니다. 선택 기술인 Electron은 쓰지 않았습니다.
 
-- 스택: Vue 3 + NestJS (TypeScript), Prisma + SQLite
+- 스택: Vue 3 + NestJS (TypeScript), Prisma + PostgreSQL (로컬은 Docker)
 - 테스트: 백엔드 단위·유스케이스 376개, 통합(e2e) 9개, 새 환경 시나리오 QA 44개
 - 설계 문서: [제도 해석과 결정](docs/decisions.md) · [설계(ERD·API·ADR)](docs/design.md) · [QA 결과](docs/qa.md)
+
+> **과제 제출본은 [`submission`](https://github.com/doosup/team-attendance-system/tree/submission) 태그입니다** (SQLite, 설치 없이 clone → 실행). 제출 뒤 실제 팀에서 쓰려고 DB를 PostgreSQL로 옮겼습니다 (ATT-55).
 
 ---
 
 ## 1. 실행 방법
 
-**필요한 것:** Node.js 22.12 이상 (DB는 SQLite 파일이라 별도 설치 없음)
+**필요한 것:** Node.js 22.12 이상, [Docker Desktop](https://www.docker.com/products/docker-desktop/) (실행 중이어야 함. PostgreSQL을 상자로 띄움)
 
 ```bash
 git clone https://github.com/doosup/team-attendance-system.git && cd team-attendance-system
 npm i            # 루트에서 한 번: backend·frontend 의존성까지 설치
-npm run setup    # .env 생성 → DB 마이그레이션 → 시드 데이터
+npm run setup    # Postgres 상자 실행 → .env 생성 → DB 마이그레이션 → 시드 데이터
 npm run dev      # 백엔드 http://localhost:3000 + 프런트 http://localhost:5173
 ```
 
@@ -37,7 +39,7 @@ npm run dev      # 백엔드 http://localhost:3000 + 프런트 http://localhost:
 
 ```bash
 npm test             # 단위·유스케이스 (backend)
-npm run test:e2e     # 통합: 매번 새 SQLite에 마이그레이션 후 실제 HTTP로 호출
+npm run test:e2e     # 통합: 매번 새 e2e 전용 DB(attendance_e2e)에 마이그레이션 후 실제 HTTP로 호출 (Postgres 상자가 떠 있어야 함)
 ```
 
 **DB 보기**
@@ -46,9 +48,9 @@ npm run test:e2e     # 통합: 매번 새 SQLite에 마이그레이션 후 실�
 cd backend && npx prisma studio   # http://localhost:5555 에서 테이블을 표로 조회
 ```
 
-DB 파일은 `backend/prisma/dev.db`(SQLite)입니다. `LeaveLedger`(잔여 원장)와 `AuditLog`(이력)에서 화면 동작이 어떻게 기록되는지 볼 수 있습니다.
+DB는 Docker의 PostgreSQL(`localhost:5432`, DB `attendance`)입니다. 터미널에서 SQL로 보려면 `docker compose exec db psql -U attendance`. `LeaveLedger`(잔여 원장)와 `AuditLog`(이력)에서 화면 동작이 어떻게 기록되는지 볼 수 있습니다.
 
-**처음 상태로 되돌리기:** `backend/prisma/dev.db`를 지우고 `npm run setup`을 다시 실행합니다. 시각을 미래로 옮겼다가 되돌리며 시험한 뒤 깨끗하게 다시 하고 싶을 때 씁니다.
+**처음 상태로 되돌리기:** `docker compose down -v`(Postgres 상자와 데이터 삭제) 후 `npm run setup`을 다시 실행합니다. 시각을 미래로 옮겼다가 되돌리며 시험한 뒤 깨끗하게 다시 하고 싶을 때 씁니다.
 
 <details>
 <summary>백엔드·프런트를 따로 띄우려면</summary>
@@ -97,13 +99,13 @@ cd frontend && npm run dev         # http://localhost:5173 (/api → 3000 프록
 | 프런트 | Vue 3 (Composition API) · Vite · Pinia · Vue Router | 과제 필수. 화면이 단순해 컴포넌트 라이브러리 없이 기본 HTML·CSS로 |
 | 달력 | @vuepic/vue-datepicker | 브라우저 기본 날짜 입력은 공휴일을 칠하거나 날짜를 막을 수 없음. 직접 만들면 키보드 조작·기간 이동까지 새로 짜야 해서 라이브러리로. 공휴일·막을 날은 서버의 `GET /holidays`와 같은 데이터로 판단 |
 | 백엔드 | NestJS 11 (TypeScript) | 과제 필수. DI로 Clock·저장소를 갈아 끼울 수 있어 시각 경계 테스트가 쉬움 |
-| DB | **SQLite + Prisma 6** | 평가자가 **설치 없이** 실행해야 함. Prisma 스키마가 읽기 쉽고 마이그레이션·시드가 명령 하나. 4명 규모라 동시 쓰기 한계는 문제되지 않음 (ADR-001) |
+| DB | **PostgreSQL 17 + Prisma 6** (로컬은 Docker) | 과제 제출 때는 평가자가 설치 없이 실행하도록 SQLite(ADR-001, `submission` 태그). 실제 팀에서 쓰려고 여러 명의 동시 쓰기에 강하고 enum·부분 인덱스를 DB가 지원하는 PostgreSQL로 옮김. Prisma 덕분에 바뀐 곳은 스키마 provider·마이그레이션·접속 주소뿐이고 도메인·유스케이스 코드는 그대로 |
 | 트랜잭션 | nestjs-cls + `@Transactional()` | 신청 → 원장 차감 → 이력처럼 여러 저장소를 한 트랜잭션으로 묶되, 유스케이스가 Prisma를 모르게 |
 | 날짜 | dayjs (utc·timezone) | 날짜(`YYYY-MM-DD`, KST)와 순간(UTC)을 구분하고, 판정은 Asia/Seoul로 |
 | 인증 | JWT 12시간 + bcrypt | 사내 도구라 세션 저장소 없이 단순하게. 비밀번호는 해시만 저장 |
 | 입력 검증 | class-validator | DTO에서 형식 검증 → 업무 규칙은 도메인에서 |
 | PDF | pdfkit + 나눔고딕(OFL) | 서버에서 정해진 양식으로 생성. 한글 글꼴을 저장소에 포함해 어디서나 같은 결과 |
-| 테스트 | Jest + Supertest | 정책은 순수 함수 단위 테스트, 흐름은 메모리 저장소, 핵심 경로는 실제 SQLite e2e |
+| 테스트 | Jest + Supertest | 정책은 순수 함수 단위 테스트, 흐름은 메모리 저장소, 핵심 경로는 실제 PostgreSQL e2e |
 
 외부 API(공휴일 API 등)는 쓰지 않았습니다. 키 발급·네트워크가 필요하면 "clone → 실행"이 깨지기 때문입니다. 공휴일은 2026·2027년을 코드에 넣었습니다.
 
@@ -125,7 +127,7 @@ flowchart LR
         U --> D["domain<br/>entity · policy · value<br/>repository(약속) · port"]
         I["infrastructure<br/>Prisma 저장소 · Clock · JWT · PDF"] -. 구현 .-> D
     end
-    I --> DB[(SQLite)]
+    I --> DB[(PostgreSQL)]
 ```
 
 **헥사고날 구조, 레이어 먼저** (ADR-006·007)
@@ -243,7 +245,7 @@ erDiagram
 | **AllowedIp** | 연구실 IP. 소프트 삭제라 "살아 있는 것 중 중복"은 DB 유일 제약 대신 유스케이스에서 확인합니다 |
 
 - **취소는 상태, 삭제는 소프트 삭제.** 신청·날짜는 CANCELED로 남겨 통계와 원장이 참조합니다. 사용자(퇴사)·연구실 IP만 `deletedAt`.
-- **선택지는 enum**(11종), 독립적인 예/아니오만 Boolean. SQLite에는 enum 타입이 없어 TypeScript 타입 → DTO 검증 → Prisma Client 세 겹으로 지킵니다.
+- **선택지는 enum**(11종), 독립적인 예/아니오만 Boolean. TypeScript 타입 → DTO 검증 → Prisma Client → PostgreSQL enum 타입 네 겹으로 지킵니다 (SQLite 시절에는 DB에 enum 타입이 없어 세 겹).
 - **인덱스는 실제 조회에 맞춰서**: 팀 보드(`RequestDay(date, status)`, `Attendance(workDate)`), 대기 목록(`Request(status, startDate)`), 이력(`AuditLog(occurredAt)`) 등.
 
 ---
@@ -293,7 +295,7 @@ erDiagram
 | 신청서 PDF 이름 조회 | 이름 두 개를 위해 전체 사용자 조회 | 인원이 늘면 id 목록 조회 |
 | 신청서 PDF | 페이지 넘김 없음 (A4 한 장) | 한 달 넘는 기간을 받게 되면 행 단위 페이지 넘김 |
 
-**동시 요청:** SQLite는 쓰기를 한 번에 하나씩 처리합니다. 적립·만료는 조회할 때 원장에 채워 넣는데, 같은 사람의 조회가 동시에 들어와도 `dedupKey` 유일 제약이 두 번째 쓰기를 막습니다. 이때 그 요청은 실패하고, 다시 조회하면 정상으로 나옵니다. 중복 신청과 재택 한도는 트랜잭션 안에서 확인하지만, DB 수준의 조건부 유일 제약은 없습니다. 4명 규모에서는 감수했고, 사람이 늘면 PostgreSQL의 부분 유일 인덱스로 옮기는 것이 다음 단계입니다.
+**동시 요청:** 적립·만료는 조회할 때 원장에 채워 넣는데, 같은 사람의 조회가 동시에 들어와도 `dedupKey` 유일 제약이 두 번째 쓰기를 막습니다. 이때 그 요청은 실패하고, 다시 조회하면 정상으로 나옵니다. 중복 신청과 재택 한도는 트랜잭션 안에서 확인하지만, DB 수준의 조건부 유일 제약은 없습니다. 4명 규모에서는 감수했고, PostgreSQL로 옮겼으니 다음 단계는 부분 유일 인덱스(`WHERE status = 'ACTIVE'`)로 DB가 직접 막게 하는 것입니다.
 
 **구현하지 않은 것**
 
@@ -313,7 +315,7 @@ erDiagram
 | 층 | 무엇을 | 개수 |
 |---|---|---|
 | 단위 + 유스케이스 | 정책·엔티티 순수 함수(경계값 06:59:59/07:00:00, 10:00:00/10:00:01, 15:59:59/16:00:00, 17:00:00/17:00:01)와, 메모리 저장소·고정 시계로 돌리는 흐름(신청 → 승인 → 취소 → 복원, 퇴사 시 자동 취소 …) | 376개 (41개 파일) |
-| 통합(e2e) | 실제 HTTP → 가드 → Prisma → 새 SQLite. 9개 시나리오: ① 출근·퇴근 판정 ② 미기록 시 퇴근 거부와 직접 입력 ③ 신청 → 승인 → 차감 → 취소 → 복원 ④ PDF 응답과 권한 ⑤ 팀원 등록 → 퇴사 → 로그인 거부 ⑥ 등록 안 된 IP 403 ⑦ 리드가 재택 IP를 바꾸면 새 IP만 허용 ⑧ 팀원의 리드 API 403 ⑨ 본인 비밀번호 변경 후 새 비밀번호로만 로그인 | 9개 |
+| 통합(e2e) | 실제 HTTP → 가드 → Prisma → 새 PostgreSQL DB. 9개 시나리오: ① 출근·퇴근 판정 ② 미기록 시 퇴근 거부와 직접 입력 ③ 신청 → 승인 → 차감 → 취소 → 복원 ④ PDF 응답과 권한 ⑤ 팀원 등록 → 퇴사 → 로그인 거부 ⑥ 등록 안 된 IP 403 ⑦ 리드가 재택 IP를 바꾸면 새 IP만 허용 ⑧ 팀원의 리드 API 403 ⑨ 본인 비밀번호 변경 후 새 비밀번호로만 로그인 | 9개 |
 | 시나리오 QA | 깨끗한 clone에서 설치·실행 후 실제 서버로 44개 흐름 | [docs/qa.md](docs/qa.md) |
 
 `npm run typecheck`(백엔드, 테스트 코드 타입까지)와 lint, 프런트 `vue-tsc`도 PR마다 통과시켰습니다.

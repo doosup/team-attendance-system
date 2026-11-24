@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  // npm run setup이 backend/.env에 DATABASE_URL="file:./dev.db"를 만든다. e2e는 file:./e2e.db
+  provider = "postgresql"
+  // npm run setup이 backend/.env에 로컬 Docker Postgres 주소를 만든다. e2e는 같은 서버의 attendance_e2e DB
   url      = env("DATABASE_URL")
 }
 

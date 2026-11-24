@@ -1,0 +1,22 @@
+# 로컬 개발용 PostgreSQL. `npm run setup`이 db 서비스를 띄운다.
+# 계정·비밀번호는 내 노트북 전용 기본값이다. 서버 배포 값은 Secrets Manager에서 받는다 (ATT-57).
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: attendance
+      POSTGRES_PASSWORD: attendance
+      POSTGRES_DB: attendance
+    # 같은 컴퓨터에서만 접속 (다른 기기에서 DB 포트로 직접 붙지 못하게)
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U attendance -d attendance']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  db-data:
