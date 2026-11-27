@@ -1,13 +1,18 @@
 # 팀 근태관리 시스템
 
-하이컨시 과제 **지정 주제 2**. 리드 1명과 팀원 3명이 쓰는 내부 근태관리 웹앱입니다.
-과제의 요구사항(FR) 13개, 즉 필수 10개(출퇴근·지각·조퇴, 미기록 퇴근, 신청·잔여, IP 제한, 팀 보드, 이력 등)와 선택 3개(승인·반려, 신청서 PDF, 월별 정산)를 구현했습니다. 선택 기술인 Electron은 쓰지 않았습니다.
+리드 1명과 팀원이 함께 쓰는 근태관리 웹앱입니다. 출퇴근, 연차·재택·반일 OFF·주말 근무 신청과 승인, 팀 보드, 월별 정산, 접속 IP 제한을 다룹니다.
 
-- 스택: Vue 3 + NestJS (TypeScript), Prisma + PostgreSQL (로컬은 Docker)
-- 테스트: 백엔드 단위·유스케이스 376개, 통합(e2e) 9개, 새 환경 시나리오 QA 44개
-- 설계 문서: [제도 해석과 결정](docs/decisions.md) · [설계(ERD·API·ADR)](docs/design.md) · [QA 결과](docs/qa.md)
+지각·조퇴·점심 차감·연차 적립·재택 한도·신청 기한·당일 취소처럼 **예외가 많은 근태 제도를 어떻게 정확하고 바꾸기 쉽게 코드로 옮길지**에 집중했습니다.
 
-> **과제 제출본은 [`submission`](https://github.com/doosup/team-attendance-system/tree/submission) 태그입니다** (SQLite, 설치 없이 clone → 실행). 제출 뒤 실제 팀에서 쓰려고 DB를 PostgreSQL로 옮겼습니다 (ATT-55).
+- **규칙은 순수 함수로:** 제도 규칙을 DB·프레임워크·시계를 모르는 정책 함수로 분리(헥사고날). `10:00:00`/`10:00:01` 같은 경계값까지 단위·유스케이스 테스트 376개, PostgreSQL e2e 9개
+- **잔여는 저장하지 않고 계산:** 연차·OFF는 적립·사용·복원·만료 원장(ledger)의 합산. 이력은 추가만 하고 지우지 않음
+- **도구가 바뀌어도 규칙은 그대로:** SQLite → PostgreSQL 전환 때 도메인·유스케이스 코드 변경 없음 (의존성 역전)
+- **실제 운영 환경:** Docker Compose로 로컬·서버 동일 실행, AWS EC2 + Secrets Manager(IAM 최소 권한) 배포, 프록시 헤더 위조 차단
+
+**스택:** TypeScript · NestJS · Prisma · PostgreSQL 17 · Vue 3 · Jest · Docker · nginx · AWS\
+**설계 문서:** [제도 해석과 결정](docs/decisions.md) · [설계(ERD·API·ADR)](docs/design.md) · [QA 결과](docs/qa.md)
+
+> 채용 과제(팀 근태관리)로 시작해, 제출 뒤 실제 팀에서 쓰려고 PostgreSQL·Docker·AWS로 확장했습니다. 제출 당시 버전은 [`submission`](https://github.com/doosup/team-attendance-system/tree/submission) 태그(SQLite, 설치 없이 clone → 실행)에 남아 있습니다. 확장 과정은 [12절](#12-제출-후-실제-팀에서-쓰기-위한-배포-aws)에 있습니다.
 
 ---
 
@@ -342,6 +347,7 @@ erDiagram
 - **직접 써 보고 리뷰:** 브라우저 QA를 직접 하며 시각을 바꿔 시험하고, DB를 조회해 원인을 따졌습니다. 이 과정에서 찾은 문제를 고쳤습니다. 예: 시계를 앞뒤로 옮기면 반일 OFF 잔여가 −1이 되던 원장 문제(결정 A25), 승인이 늦은 날의 판정(A24), 오해를 주던 재택 한도 문구와 리드 화면 오류 위치.
 - **규칙은 테스트로 고정:** 판정 규칙은 테스트를 먼저 쓰고 경계값까지 확인했습니다. 자동 코드 리뷰 지적은 반영하거나 반영하지 않은 이유를 남겼고, 제출 전에는 새 폴더에 clone해 설치·실행·테스트를 다시 확인했습니다.
 - **티켓 단위 작업:** Notion 작업 보드의 티켓 하나 = 브랜치 하나 = PR 하나.
+- **AI 작업 규칙은 사람이 정함:** 저장소의 [CLAUDE.md](CLAUDE.md)는 AI에게 지키게 한 규칙입니다. 레이어 의존 방향, `new Date()` 금지(Clock 주입), 정책 변경은 테스트 먼저, 확정되지 않은 제도 해석은 임의로 정하지 말고 질문하기 등을 적어 두고 PR 단위로 결과를 확인했습니다.
 
 ---
 
@@ -381,6 +387,8 @@ aws ssm send-command --instance-ids <인스턴스 ID> --document-name AWS-RunShe
 
 **정리(비용 멈추기):** EC2 종료(Terminate) → Elastic IP 릴리스 → Secrets Manager 비밀 삭제 → IAM 역할·보안 그룹 삭제. 켜 두는 동안의 비용은 EC2·공인 IPv4·디스크·비밀 1개다.
 
+**데모 서버:** 비용 때문에 상시 운영하지 않고, 연구실(허용) IP에서만 로그인됩니다. 같은 구성은 위 `deploy/` 스크립트와 Secrets Manager 비밀 하나로 다시 만들 수 있습니다. 동작 화면은 배포 서버에서 직접 확인했고, 허용 목록에 없는 IP(휴대폰 데이터)는 로그인 전부터 403으로 막혔습니다.
+
 **남은 일:** 도메인 연결 후 HTTPS(nginx + Let's Encrypt). 지금은 HTTP라 비밀번호가 암호화되지 않고 전송된다. DB 자동 백업. 실제 연구실 IP로 교체.
 
 ---
@@ -390,6 +398,6 @@ aws ssm send-command --instance-ids <인스턴스 ID> --document-name AWS-RunShe
 | 문서 | 내용 |
 |---|---|
 | [docs/decisions.md](docs/decisions.md) | 제도 해석 원칙과 결정·근거·대안, 반일 OFF 예시, 확장 방안 |
-| [docs/design.md](docs/design.md) | ERD, 테이블별 설계 이유, 디렉토리 구조, 테스트 전략, API 목록, 에러 코드, ADR-001~007 |
+| [docs/design.md](docs/design.md) | ERD, 테이블별 설계 이유, 디렉토리 구조, 테스트 전략, API 목록, 에러 코드, ADR-001~008 |
 | [docs/qa.md](docs/qa.md) | 새 환경 실행 점검과 시나리오 QA 결과, 화면으로 따라 하기 |
 | [docs/workflow.md](docs/workflow.md) | 작업 순서와 티켓 진행 방식 |
